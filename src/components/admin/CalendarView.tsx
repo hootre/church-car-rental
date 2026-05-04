@@ -77,7 +77,7 @@ export default function CalendarView() {
       toast.error("일정을 불러오지 못했습니다");
       console.error(error);
     } else {
-      setReservations(data || []);
+      setReservations((data || []).filter((r) => r.status !== "cancelled"));
     }
   }, [year, month]);
 
@@ -276,7 +276,7 @@ export default function CalendarView() {
 
       {/* 범례 */}
       <div className="flex flex-wrap gap-2 mb-3">
-        {Object.entries(statusLabel).map(([key, label]) => (
+        {Object.entries(statusLabel).filter(([key]) => key !== "cancelled").map(([key, label]) => (
           <div key={key} className="flex items-center gap-1">
             <div className={`w-2 h-2 rounded-full ${dotColor[key]}`} />
             <span className="text-[10px] text-gray-500">{label}</span>
