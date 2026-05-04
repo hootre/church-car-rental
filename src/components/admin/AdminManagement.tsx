@@ -20,7 +20,7 @@ export default function AdminManagement({ currentAdminId }: Props) {
     password: "",
     password_confirm: "",
     name: "",
-    role: "member" as "member" | "staff" | "manager" | "super_admin",
+    role: "member" as "member" | "staff" | "manager" | "emergency" | "super_admin",
   });
 
   // 비밀번호 변경 폼
@@ -185,6 +185,7 @@ export default function AdminManagement({ currentAdminId }: Props) {
       case "super_admin": return "bg-purple-100 text-purple-700";
       case "manager": return "bg-orange-100 text-orange-700";
       case "staff": return "bg-primary-100 text-primary-700";
+      case "emergency": return "bg-red-100 text-red-700";
       case "member": return "bg-gray-100 text-gray-600";
       default: return "bg-gray-100 text-gray-700";
     }
@@ -195,6 +196,7 @@ export default function AdminManagement({ currentAdminId }: Props) {
       case "super_admin": return "bg-purple-100 text-purple-700";
       case "manager": return "bg-orange-100 text-orange-700";
       case "staff": return "bg-blue-100 text-blue-700";
+      case "emergency": return "bg-red-100 text-red-700";
       case "member": return "bg-gray-100 text-gray-600";
       default: return "bg-gray-100 text-gray-700";
     }
@@ -273,12 +275,13 @@ export default function AdminManagement({ currentAdminId }: Props) {
             <label className="block text-xs text-gray-500 mb-1">권한</label>
             <select
               value={form.role}
-              onChange={(e) => setForm((p) => ({ ...p, role: e.target.value as "member" | "staff" | "manager" | "super_admin" }))}
+              onChange={(e) => setForm((p) => ({ ...p, role: e.target.value as "member" | "staff" | "manager" | "emergency" | "super_admin" }))}
               className="input-field !py-2 text-sm"
             >
               <option value="member">부원 (조회만)</option>
-              <option value="staff">담당 (1차 승인)</option>
-              <option value="manager">부장 (최종 승인)</option>
+              <option value="staff">차량담당 장로 (1차 승인)</option>
+              <option value="manager">기획장로 (최종 승인)</option>
+              <option value="emergency">긴급승인자 (1차+2차 승인)</option>
               <option value="super_admin">최고관리자 (모든 권한)</option>
             </select>
           </div>

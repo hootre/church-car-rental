@@ -245,14 +245,14 @@ export default function ReservationHistory() {
       <div class="section-title">승인 현황</div>
       <div class="approval-box">
         <div class="approval-card">
-          <div class="title">담당 승인</div>
+          <div class="title">차량담당 장로 승인</div>
           ${r.staff_approved_at
             ? `<div class="stamp">승인</div><div class="name">${staffName}</div><div class="date">${new Date(r.staff_approved_at).toLocaleDateString("ko-KR")}</div>`
             : `<div class="pending">미승인</div>`
           }
         </div>
         <div class="approval-card">
-          <div class="title">부장 승인</div>
+          <div class="title">기획장로 승인</div>
           ${r.manager_approved_at
             ? `<div class="stamp">승인</div><div class="name">${managerName}</div><div class="date">${new Date(r.manager_approved_at).toLocaleDateString("ko-KR")}</div>`
             : `<div class="pending">미승인</div>`
@@ -342,7 +342,7 @@ export default function ReservationHistory() {
                 >
                   <option value="all">전체</option>
                   <option value="pending">대기중</option>
-                  <option value="staff_approved">담당승인</option>
+                  <option value="staff_approved">1차승인</option>
                   <option value="approved">승인완료</option>
                   <option value="in_use">대여중</option>
                   <option value="returned">반납완료</option>
@@ -460,14 +460,14 @@ export default function ReservationHistory() {
                         <div className={`text-xs font-bold ${r.staff_approved_at ? "text-emerald-600" : "text-gray-300"}`}>
                           {r.staff_approved_at ? "✓ 승인" : "⏳ 대기"}
                         </div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">담당</div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">차량담당 장로</div>
                       </div>
                       <div className="w-px bg-gray-200" />
                       <div className="flex-1 text-center">
                         <div className={`text-xs font-bold ${r.manager_approved_at ? "text-green-600" : "text-gray-300"}`}>
                           {r.manager_approved_at ? "✓ 승인" : "⏳ 대기"}
                         </div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">부장</div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">기획장로</div>
                       </div>
                     </div>
 
@@ -618,7 +618,7 @@ export default function ReservationHistory() {
                 <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">승인 현황</h4>
                 <div className="bg-gray-50 rounded-xl p-4">
                   <div className="flex gap-4">
-                    {/* 담당 승인 */}
+                    {/* 차량담당 장로 승인 */}
                     <div className="flex-1 text-center">
                       <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-2 ${
                         modalReservation.staff_approved_at
@@ -640,7 +640,7 @@ export default function ReservationHistory() {
                       }`}>
                         {modalReservation.staff_approved_at ? "승인완료" : "미승인"}
                       </div>
-                      <div className="text-[10px] text-gray-500 mt-0.5">담당</div>
+                      <div className="text-[10px] text-gray-500 mt-0.5">차량담당 장로</div>
                       {modalReservation.staff_approved_at && (
                         <>
                           <div className="text-xs text-gray-600 mt-1 font-medium">
@@ -660,7 +660,7 @@ export default function ReservationHistory() {
                       </svg>
                     </div>
 
-                    {/* 부장 승인 */}
+                    {/* 기획장로 승인 */}
                     <div className="flex-1 text-center">
                       <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-2 ${
                         modalReservation.manager_approved_at
@@ -682,7 +682,7 @@ export default function ReservationHistory() {
                       }`}>
                         {modalReservation.manager_approved_at ? "승인완료" : "미승인"}
                       </div>
-                      <div className="text-[10px] text-gray-500 mt-0.5">부장</div>
+                      <div className="text-[10px] text-gray-500 mt-0.5">기획장로</div>
                       {modalReservation.manager_approved_at && (
                         <>
                           <div className="text-xs text-gray-600 mt-1 font-medium">

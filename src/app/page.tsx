@@ -4,8 +4,6 @@ import Link from "next/link";
 import Header from "@/components/Header";
 
 export default function HomePage() {
-  const churchName = process.env.NEXT_PUBLIC_CHURCH_NAME || "교회";
-
   return (
     <div className="min-h-screen pb-20">
       <Header />
@@ -17,7 +15,7 @@ export default function HomePage() {
             <span className="text-4xl">🚗</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {churchName} 차량 대여
+            한국중앙교회 차량부
           </h1>
           <p className="text-gray-500 text-sm">
             교회 차량을 간편하게 예약하세요
@@ -75,14 +73,23 @@ export default function HomePage() {
           </Link>
         </div>
 
-        {/* 안내사항 */}
+        {/* 이용 안내 */}
         <div className="mt-8 p-4 bg-blue-50 rounded-2xl">
           <h3 className="font-semibold text-primary-800 text-sm mb-2">이용 안내</h3>
           <ul className="text-xs text-primary-700 space-y-1">
             <li>• 예약 신청 후 관리자 승인이 필요합니다</li>
             <li>• 차량 사용 후 원래 주차 위치에 반납해 주세요</li>
-            <li>• 사용 중 문제 발생 시 주차부로 연락 바랍니다</li>
+            <li>• 사용 중 문제 발생 시 차량부로 연락 바랍니다</li>
           </ul>
+        </div>
+
+        {/* 담당 연락처 */}
+        <div className="mt-4 p-4 bg-gray-50 rounded-2xl text-center">
+          <p className="text-sm font-semibold text-gray-700 mb-1">담당연락처</p>
+          <p className="text-sm text-gray-600">이학수 안수집사</p>
+          <a href="tel:010-8760-9338" className="text-primary-600 font-bold text-lg">
+            010-8760-9338
+          </a>
         </div>
       </main>
     </div>

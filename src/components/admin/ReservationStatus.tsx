@@ -74,12 +74,12 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
       admin_note: actionNote || reservation.admin_note,
     };
 
-    // 담당 승인
+    // 차량담당 장로 승인
     if (nextStatus === "staff_approved") {
       updateData.staff_approved_by = adminId;
       updateData.staff_approved_at = new Date().toISOString();
     }
-    // 부장 승인
+    // 기획장로 승인
     if (nextStatus === "approved") {
       updateData.manager_approved_by = adminId;
       updateData.manager_approved_at = new Date().toISOString();
@@ -111,9 +111,9 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
   function getActionButton(status: string) {
     switch (status) {
       case "staff_approved":
-        return { label: "담당 승인", color: "bg-emerald-500 hover:bg-emerald-600" };
+        return { label: "차량담당 장로 승인", color: "bg-emerald-500 hover:bg-emerald-600" };
       case "approved":
-        return { label: "부장 승인", color: "bg-green-500 hover:bg-green-600" };
+        return { label: "기획장로 승인", color: "bg-green-500 hover:bg-green-600" };
       case "rejected":
         return { label: "거절", color: "bg-red-500 hover:bg-red-600" };
       case "in_use":
@@ -130,7 +130,7 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
       {/* 통계 카드 */}
       <div className="grid grid-cols-3 gap-2 mb-4">
         <StatCard label="대기" count={stats.pending} color="text-yellow-600" />
-        <StatCard label="담당승인" count={stats.staff_approved} color="text-emerald-600" />
+        <StatCard label="1차승인" count={stats.staff_approved} color="text-emerald-600" />
         <StatCard label="승인완료" count={stats.approved} color="text-green-600" />
         <StatCard label="대여중" count={stats.in_use} color="text-blue-600" />
         <StatCard label="반납" count={stats.returned} color="text-purple-600" />
@@ -142,7 +142,7 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
         {[
           { key: "all", label: "전체" },
           { key: "pending", label: "대기" },
-          { key: "staff_approved", label: "담당승인" },
+          { key: "staff_approved", label: "1차승인" },
           { key: "approved", label: "승인완료" },
           { key: "in_use", label: "대여중" },
           { key: "returned", label: "반납" },
@@ -215,7 +215,7 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
                           <div className={`text-xs font-bold ${r.staff_approved_at ? "text-emerald-600" : "text-gray-300"}`}>
                             {r.staff_approved_at ? "✓ 승인" : "⏳ 대기"}
                           </div>
-                          <div className="text-[10px] text-gray-400 mt-0.5">담당</div>
+                          <div className="text-[10px] text-gray-400 mt-0.5">차량담당 장로</div>
                           {r.staff_approved_at && (
                             <div className="text-[10px] text-gray-400">
                               {new Date(r.staff_approved_at).toLocaleDateString("ko-KR")}
@@ -227,7 +227,7 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
                           <div className={`text-xs font-bold ${r.manager_approved_at ? "text-green-600" : "text-gray-300"}`}>
                             {r.manager_approved_at ? "✓ 승인" : "⏳ 대기"}
                           </div>
-                          <div className="text-[10px] text-gray-400 mt-0.5">부장</div>
+                          <div className="text-[10px] text-gray-400 mt-0.5">기획장로</div>
                           {r.manager_approved_at && (
                             <div className="text-[10px] text-gray-400">
                               {new Date(r.manager_approved_at).toLocaleDateString("ko-KR")}
@@ -300,7 +300,7 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
                             {adminRole === "member"
                               ? "부원은 승인 권한이 없습니다 (조회만 가능)"
                               : adminRole === "staff" && transitions.includes("approved")
-                              ? "부장 승인은 부장 권한이 필요합니다"
+                              ? "기획장로 승인은 기획장로 권한이 필요합니다"
                               : "이 단계의 승인 권한이 없습니다"}
                           </p>
                         )}

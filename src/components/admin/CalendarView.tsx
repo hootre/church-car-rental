@@ -18,6 +18,16 @@ const dotColor: Record<string, string> = {
   rejected: "bg-red-300",
 };
 
+// 상태별 이벤트 태그 배경색
+const eventPillColor: Record<string, string> = {
+  pending: "bg-yellow-100 text-yellow-700",
+  staff_approved: "bg-emerald-100 text-emerald-700",
+  approved: "bg-green-100 text-green-700",
+  in_use: "bg-blue-100 text-blue-700",
+  returned: "bg-purple-100 text-purple-700",
+  rejected: "bg-red-100 text-red-700",
+};
+
 export default function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -177,14 +187,15 @@ export default function CalendarView() {
       </div>
 
       {/* 달력 그리드 */}
-      <div className="card !p-2 mb-4">
-        <div className="grid grid-cols-7 mb-1">
+      <div className="card !p-0 mb-4 overflow-hidden">
+        {/* 요일 헤더 */}
+        <div className="grid grid-cols-7 border-b border-gray-200">
           {WEEKDAYS.map((day, i) => (
             <div
               key={day}
-              className={`text-center text-xs font-medium py-1 ${
-                i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : "text-gray-400"
-              }`}
+              className={`text-center text-xs font-medium py-2 px-1
+                ${i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : "text-gray-400"}
+              `}
             >
               {day}
             </div>
@@ -206,24 +217,33 @@ export default function CalendarView() {
                 <button
                   key={idx}
                   onClick={() => setSelectedDate(isSelected ? null : dateStr)}
-                  className={`relative p-1 min-h-[52px] flex flex-col items-center
-                              border-t border-gray-50 transition-colors
-                              ${isCurrentMonth ? "" : "opacity-30"}
-                              ${isSelected ? "bg-primary-50 rounded-lg" : "hover:bg-gray-50"}`}
+                  className={`relative p-2 md:p-3 min-h-[52px] md:min-h-[100px] border-r border-b border-gray-200
+                              flex flex-col items-start transition-colors
+                              ${isCurrentMonth ? "" : "opacity-30 bg-gray-50"}
+                              ${isSelected ? "bg-primary-50" : "hover:bg-gray-50"}
+                              ${
+                                idx % 7 === 6 ? "border-r-0" : ""
+                              }
+                              ${idx + 7 > calendarDays.length - 1 ? "border-b-0" : ""}
+                  `}
                 >
-                  <span
-                    className={`text-xs leading-none w-6 h-6 flex items-center justify-center rounded-full
-                      ${isToday ? "bg-primary-600 text-white font-bold" : ""}
-                      ${!isToday && dayOfWeek === 0 ? "text-red-400" : ""}
-                      ${!isToday && dayOfWeek === 6 ? "text-blue-400" : ""}
-                      ${!isToday && dayOfWeek !== 0 && dayOfWeek !== 6 ? "text-gray-700" : ""}
-                    `}
-                  >
-                    {date.getDate()}
-                  </span>
+                  {/* 날짜 번호 */}
+                  <div className="mb-1 md:mb-2 w-full">
+                    <span
+                      className={`inline-flex text-xs md:text-sm leading-none px-1.5 py-0.5 rounded-full
+                        ${isToday ? "bg-primary-600 text-white font-bold" : ""}
+                        ${!isToday && dayOfWeek === 0 ? "text-red-400" : ""}
+                        ${!isToday && dayOfWeek === 6 ? "text-blue-400" : ""}
+                        ${!isToday && dayOfWeek !== 0 && dayOfWeek !== 6 ? "text-gray-700" : ""}
+                      `}
+                    >
+                      {date.getDate()}
+                    </span>
+                  </div>
 
+                  {/* 모바일: 도트 표시 */}
                   {dayReservations.length > 0 && (
-                    <div className="flex flex-wrap gap-[2px] justify-center mt-1 max-w-full">
+                    <div className="md:hidden flex flex-wrap gap-[2px] w-full">
                       {dayReservations.length <= 3 ? (
                         dayReservations.map((r, i) => (
                           <div
@@ -239,6 +259,28 @@ export default function CalendarView() {
                             +{dayReservations.length - 2}
                           </span>
                         </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 데스크탑: 텍스트 이벤트 레이블 */}
+                  {dayReservations.length > 0 && (
+                    <div className="hidden md:flex flex-col gap-1 w-full flex-1 overflow-hidden">
+                      {dayReservations.slice(0, 3).map((r, i) => (
+                        <div
+                          key={i}
+                          className={`text-[10px] px-1.5 py-0.5 rounded truncate font-medium whitespace-nowrap
+                            ${eventPillColor[r.status] || "bg-gray-100 text-gray-700"}
+                          `}
+                          title={`${r.vehicles?.name || "차량"} ${r.guest_name}`}
+                        >
+                          {r.vehicles?.name} {r.guest_name}
+                        </div>
+                      ))}
+                      {dayReservations.length > 3 && (
+                        <div className="text-[10px] text-gray-500 px-1.5 py-0.5">
+                          +{dayReservations.length - 3} more
+                        </div>
                       )}
                     </div>
                   )}
@@ -365,7 +407,7 @@ function MonthSummary({ reservations }: { reservations: Reservation[] }) {
 
       <div className="grid grid-cols-3 gap-1.5">
         <MiniStat label="대기" count={stats.pending} />
-        <MiniStat label="담당승인" count={stats.staff_approved} />
+        <MiniStat label="1차승인" count={stats.staff_approved} />
         <MiniStat label="승인완료" count={stats.approved} />
         <MiniStat label="대여중" count={stats.in_use} />
         <MiniStat label="반납" count={stats.returned} />

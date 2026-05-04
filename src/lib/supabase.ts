@@ -17,7 +17,7 @@ export const vehicleTypeLabel: Record<string, string> = {
 // 예약 상태 한글 매핑
 export const statusLabel: Record<string, string> = {
   pending: "대기중",
-  staff_approved: "담당승인",
+  staff_approved: "차량담당 장로 승인",
   approved: "승인완료",
   rejected: "거절",
   in_use: "대여중",
@@ -34,7 +34,7 @@ export const statusColor: Record<string, string> = {
 };
 
 // 상태 전이 규칙
-// pending → staff_approved (담당 승인) → approved (부장 승인) → in_use → returned
+// pending → staff_approved (차량담당 장로 승인) → approved (기획장로 승인) → in_use → returned
 export const statusTransitions: Record<string, string[]> = {
   pending: ["staff_approved", "rejected"],
   staff_approved: ["approved", "rejected"],
@@ -45,15 +45,16 @@ export const statusTransitions: Record<string, string[]> = {
 };
 
 // 상태 변경 시 필요한 역할
-// 담당(staff): 1차 승인 가능, 부장(manager): 2차(최종) 승인 가능
-// 부원(member): 승인 권한 없음 (조회만)
+// staff(차량담당 장로): 1차 승인, manager(기획장로): 2차(최종) 승인
+// emergency(긴급승인자): 1차+2차 모두 가능
+// member(부원): 승인 권한 없음 (조회만)
 // super_admin: 모든 권한
 export const statusRequiredRole: Record<string, string[]> = {
-  staff_approved: ["staff", "manager", "super_admin"],       // 1차 승인: 담당, 부장, 최고관리자
-  approved: ["manager", "super_admin"],                      // 최종 승인: 부장, 최고관리자만
-  rejected: ["staff", "manager", "super_admin"],             // 거절: 담당 이상
-  in_use: ["staff", "manager", "super_admin"],               // 대여 시작: 담당 이상
-  returned: ["staff", "manager", "super_admin"],             // 반납: 담당 이상
+  staff_approved: ["staff", "manager", "emergency", "super_admin"],
+  approved: ["manager", "emergency", "super_admin"],
+  rejected: ["staff", "manager", "emergency", "super_admin"],
+  in_use: ["staff", "manager", "emergency", "super_admin"],
+  returned: ["staff", "manager", "emergency", "super_admin"],
 };
 
 // 타입 정의
@@ -154,7 +155,7 @@ export interface Admin {
   id: string;
   login_id: string;
   name: string;
-  role: "super_admin" | "staff" | "manager" | "member";
+  role: "super_admin" | "staff" | "manager" | "member" | "emergency";
   is_active: boolean;
   created_at: string;
   last_login_at: string | null;
@@ -163,8 +164,9 @@ export interface Admin {
 // 관리자 역할 한글 매핑
 export const roleLabel: Record<string, string> = {
   super_admin: "최고관리자",
-  staff: "담당",
-  manager: "부장",
+  staff: "차량담당 장로",
+  manager: "기획장로",
+  emergency: "긴급승인자",
   member: "부원",
 };
 

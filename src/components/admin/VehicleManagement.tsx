@@ -3,13 +3,30 @@
 import { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
 import {
-  supabase, Vehicle, VehicleInsurance, VehicleMaintenance,
-  vehicleTypeLabel, maintenanceTypeLabel, categoryLabel,
+  supabase, Vehicle, VehicleInsurance, VehicleMaintenance, Reservation,
+  vehicleTypeLabel, maintenanceTypeLabel, categoryLabel, statusLabel,
 } from "@/lib/supabase";
+import StatusBadge from "@/components/StatusBadge";
 
 type ViewMode = "list" | "detail";
-type DetailTab = "info" | "insurance" | "maintenance";
+type DetailTab = "info" | "insurance" | "maintenance" | "history";
 type VehicleStatus = "available" | "in_use" | "unavailable";
+
+interface VehicleFormData {
+  name: string;
+  type: string;
+  plate_number: string;
+  year: number;
+  capacity: number;
+  description: string;
+  age_limit: string;
+  category: "shared" | "personal";
+  insurance_company: string;
+  insurance_phone: string;
+  insurance_expiry: string;
+  insurance_agent: string;
+  insurance_agent_phone: string;
+}
 
 const statusConfig: Record<VehicleStatus, { label: string; bg: string; text: string }> = {
   available: { label: "사용가능", bg: "bg-green-100", text: "text-green-700" },
@@ -17,6 +34,240 @@ const statusConfig: Record<VehicleStatus, { label: string; bg: string; text: str
   unavailable: { label: "사용불가", bg: "bg-red-100", text: "text-red-700" },
 };
 
+// ========== InfoRow 컴포넌트 ==========
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between text-sm">
+      <span className="text-gray-500">{label}</span>
+      <span className="text-gray-900 font-medium">{value}</span>
+    </div>
+  );
+}
+
+// ========== VehicleForm 컴포넌트 ==========
+interface VehicleFormProps {
+  form: VehicleFormData;
+  setForm: React.Dispatch<React.SetStateAction<VehicleFormData>>;
+  onSubmit: (e: React.FormEvent) => void;
+  submitLabel: string;
+  onCancel: () => void;
+}
+
+function VehicleForm({ form, setForm, onSubmit, submitLabel, onCancel }: VehicleFormProps) {
+  return (
+    <form onSubmit={onSubmit} className="card space-y-3 mb-4">
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">차량명 *</label>
+          <input
+            type="text"
+            value={form.name}
+            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+            placeholder="예: 쏠라티 1호차"
+            className="input-field !py-2 text-sm"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">차량번호 *</label>
+          <input
+            type="text"
+            value={form.plate_number}
+            onChange={(e) => setForm((p) => ({ ...p, plate_number: e.target.value }))}
+            placeholder="12가 3456"
+            className="input-field !py-2 text-sm"
+            required
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">차종</label>
+          <select
+            value={form.type}
+            onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}
+            className="input-field !py-2 text-sm"
+          >
+            {Object.entries(vehicleTypeLabel).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">분류</label>
+          <select
+            value={form.category}
+            onChange={(e) => setForm((p) => ({ ...p, category: e.target.value as "shared" | "personal" }))}
+            className="input-field !py-2 text-sm"
+          >
+            <option value="shared">공유차량</option>
+            <option value="personal">개인차량</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">연식</label>
+          <input
+            type="number"
+            value={form.year}
+            onChange={(e) => setForm((p) => ({ ...p, year: parseInt(e.target.value) || 2024 }))}
+            className="input-field !py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">정원</label>
+          <input
+            type="number"
+            value={form.capacity}
+            onChange={(e) => setForm((p) => ({ ...p, capacity: parseInt(e.target.value) || 5 }))}
+            className="input-field !py-2 text-sm"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">연령제한</label>
+          <input
+            type="text"
+            value={form.age_limit}
+            onChange={(e) => setForm((p) => ({ ...p, age_limit: e.target.value }))}
+            placeholder="26세 이상"
+            className="input-field !py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">비고</label>
+          <input
+            type="text"
+            value={form.description}
+            onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+            placeholder="참고사항"
+            className="input-field !py-2 text-sm"
+          />
+        </div>
+      </div>
+
+      {/* 보험 정보 */}
+      <div className="border-t border-gray-100 pt-3">
+        <p className="text-xs text-gray-400 mb-2">보험 정보 (선택)</p>
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            type="text"
+            value={form.insurance_company}
+            onChange={(e) => setForm((p) => ({ ...p, insurance_company: e.target.value }))}
+            placeholder="보험사"
+            className="input-field !py-2 text-sm"
+          />
+          <input
+            type="text"
+            value={form.insurance_phone}
+            onChange={(e) => setForm((p) => ({ ...p, insurance_phone: e.target.value }))}
+            placeholder="사고접수 번호"
+            className="input-field !py-2 text-sm"
+          />
+        </div>
+        <div className="grid grid-cols-3 gap-2 mt-2">
+          <input
+            type="date"
+            value={form.insurance_expiry}
+            onChange={(e) => setForm((p) => ({ ...p, insurance_expiry: e.target.value }))}
+            className="input-field !py-2 text-sm"
+            title="보험만기일"
+          />
+          <input
+            type="text"
+            value={form.insurance_agent}
+            onChange={(e) => setForm((p) => ({ ...p, insurance_agent: e.target.value }))}
+            placeholder="설계사"
+            className="input-field !py-2 text-sm"
+          />
+          <input
+            type="text"
+            value={form.insurance_agent_phone}
+            onChange={(e) => setForm((p) => ({ ...p, insurance_agent_phone: e.target.value }))}
+            placeholder="설계사 연락처"
+            className="input-field !py-2 text-sm"
+          />
+        </div>
+      </div>
+
+      <div className="flex gap-2 pt-1">
+        <button type="button" onClick={onCancel} className="btn-outline !py-2 text-sm">
+          취소
+        </button>
+        <button type="submit" className="btn-primary !py-2 text-sm">
+          {submitLabel}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ========== VehicleCard 컴포넌트 ==========
+interface VehicleCardProps {
+  v: Vehicle;
+  status: VehicleStatus;
+  onLoadDetail: (vehicle: Vehicle) => void;
+  onToggleAvailable: (vehicle: Vehicle) => void;
+}
+
+function VehicleCard({ v, status, onLoadDetail, onToggleAvailable }: VehicleCardProps) {
+  const cfg = statusConfig[status];
+
+  return (
+    <div className="card !p-3">
+      <div className="flex items-center justify-between">
+        <button onClick={() => onLoadDetail(v)} className="flex-1 text-left">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">
+              {v.type === "bus" ? "🚌" : v.type === "van" ? "🚐" : v.type === "truck" ? "🚛" : "🚗"}
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h4 className="font-bold text-sm text-gray-900">{v.name}</h4>
+                {v.category === "personal" && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                    개인
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-400">
+                {v.plate_number} · {v.year}년식 · {v.capacity}인승
+              </p>
+            </div>
+          </div>
+        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${cfg.bg} ${cfg.text}`}>
+            {cfg.label}
+          </span>
+          {status !== "in_use" && (
+            <button
+              onClick={() => onToggleAvailable(v)}
+              className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                v.available
+                  ? "border-red-200 text-red-500 hover:bg-red-50"
+                  : "border-green-200 text-green-600 hover:bg-green-50"
+              }`}
+            >
+              {v.available ? "사용불가로" : "사용가능으로"}
+            </button>
+          )}
+        </div>
+      </div>
+      {v.insurance_company && (
+        <div className="mt-1.5 text-[10px] text-gray-400">
+          보험: {v.insurance_company} (만기: {v.insurance_expiry})
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ========== Main Component ==========
 export default function VehicleManagement() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,6 +281,7 @@ export default function VehicleManagement() {
   // 보험/정비 데이터
   const [insurances, setInsurances] = useState<VehicleInsurance[]>([]);
   const [maintenances, setMaintenances] = useState<VehicleMaintenance[]>([]);
+  const [usageHistory, setUsageHistory] = useState<Reservation[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   // 추가/수정 폼
@@ -39,21 +291,37 @@ export default function VehicleManagement() {
   const [editingInfo, setEditingInfo] = useState(false);
 
   // 차량 수정 폼 데이터
-  const [editForm, setEditForm] = useState({
-    name: "", type: "sedan", plate_number: "", year: 2024,
-    capacity: 5, description: "", age_limit: "",
-    category: "shared" as "shared" | "personal",
-    insurance_company: "", insurance_phone: "",
-    insurance_expiry: "", insurance_agent: "", insurance_agent_phone: "",
+  const [editForm, setEditForm] = useState<VehicleFormData>({
+    name: "",
+    type: "sedan",
+    plate_number: "",
+    year: 2024,
+    capacity: 5,
+    description: "",
+    age_limit: "",
+    category: "shared",
+    insurance_company: "",
+    insurance_phone: "",
+    insurance_expiry: "",
+    insurance_agent: "",
+    insurance_agent_phone: "",
   });
 
   // 차량 추가 폼 데이터
-  const [addForm, setAddForm] = useState({
-    name: "", type: "sedan", plate_number: "", year: 2024,
-    capacity: 5, description: "", age_limit: "",
-    category: "shared" as "shared" | "personal",
-    insurance_company: "", insurance_phone: "",
-    insurance_expiry: "", insurance_agent: "", insurance_agent_phone: "",
+  const [addForm, setAddForm] = useState<VehicleFormData>({
+    name: "",
+    type: "sedan",
+    plate_number: "",
+    year: 2024,
+    capacity: 5,
+    description: "",
+    age_limit: "",
+    category: "shared",
+    insurance_company: "",
+    insurance_phone: "",
+    insurance_expiry: "",
+    insurance_agent: "",
+    insurance_agent_phone: "",
   });
 
   const fetchInUseVehicles = useCallback(async () => {
@@ -95,13 +363,15 @@ export default function VehicleManagement() {
     setEditingInfo(false);
     setLoadingDetail(true);
 
-    const [insRes, maintRes] = await Promise.all([
+    const [insRes, maintRes, histRes] = await Promise.all([
       supabase.from("vehicle_insurance").select("*").eq("vehicle_id", vehicle.id).order("end_date", { ascending: false }),
       supabase.from("vehicle_maintenance").select("*").eq("vehicle_id", vehicle.id).order("maintenance_date", { ascending: false }),
+      supabase.from("reservations").select("*").eq("vehicle_id", vehicle.id).order("start_date", { ascending: false }),
     ]);
 
     setInsurances(insRes.data || []);
     setMaintenances(maintRes.data || []);
+    setUsageHistory(histRes.data || []);
     setLoadingDetail(false);
   }
 
@@ -158,11 +428,19 @@ export default function VehicleManagement() {
       toast.success("차량이 추가되었습니다");
       setShowAddVehicle(false);
       setAddForm({
-        name: "", type: "sedan", plate_number: "", year: 2024,
-        capacity: 5, description: "", age_limit: "",
+        name: "",
+        type: "sedan",
+        plate_number: "",
+        year: 2024,
+        capacity: 5,
+        description: "",
+        age_limit: "",
         category: "shared",
-        insurance_company: "", insurance_phone: "",
-        insurance_expiry: "", insurance_agent: "", insurance_agent_phone: "",
+        insurance_company: "",
+        insurance_phone: "",
+        insurance_expiry: "",
+        insurance_agent: "",
+        insurance_agent_phone: "",
       });
       fetchVehicles();
     }
@@ -265,14 +543,14 @@ export default function VehicleManagement() {
 
     const { error } = await supabase.from("vehicle_insurance").insert({
       vehicle_id: selectedVehicle.id,
-      insurance_company: fd.get("company") as string,
-      end_date: fd.get("end_date") as string,
-      coverage_type: fd.get("coverage_type") as string || "종합보험",
-      agent_name: fd.get("agent_name") as string || null,
-      agent_phone: fd.get("agent_phone") as string || null,
-      accident_phone: fd.get("accident_phone") as string || null,
+      insurance_company: (fd.get("company") as string) || "",
+      end_date: (fd.get("end_date") as string) || "",
+      coverage_type: (fd.get("coverage_type") as string) || "종합보험",
+      agent_name: (fd.get("agent_name") as string) || null,
+      agent_phone: (fd.get("agent_phone") as string) || null,
+      accident_phone: (fd.get("accident_phone") as string) || null,
       premium: parseInt(fd.get("premium") as string) || 0,
-      memo: fd.get("memo") as string || null,
+      memo: (fd.get("memo") as string) || null,
     });
 
     if (error) toast.error("보험 추가 실패");
@@ -291,13 +569,13 @@ export default function VehicleManagement() {
 
     const { error } = await supabase.from("vehicle_maintenance").insert({
       vehicle_id: selectedVehicle.id,
-      maintenance_date: fd.get("date") as string,
-      maintenance_type: fd.get("type") as string,
-      description: fd.get("description") as string,
+      maintenance_date: (fd.get("date") as string) || "",
+      maintenance_type: (fd.get("type") as string) || "",
+      description: (fd.get("description") as string) || "",
       cost: parseInt(fd.get("cost") as string) || 0,
       mileage: parseInt(fd.get("mileage") as string) || null,
-      shop_name: fd.get("shop") as string || null,
-      memo: fd.get("memo") as string || null,
+      shop_name: (fd.get("shop") as string) || null,
+      memo: (fd.get("memo") as string) || null,
     });
 
     if (error) toast.error("정비 추가 실패");
@@ -324,210 +602,16 @@ export default function VehicleManagement() {
 
   // 상태별 차량 수
   const statusCounts = vehicles.reduce(
-    (acc, v) => { acc[getVehicleStatus(v)]++; return acc; },
+    (acc, v) => {
+      acc[getVehicleStatus(v)]++;
+      return acc;
+    },
     { available: 0, in_use: 0, unavailable: 0 } as Record<VehicleStatus, number>
   );
 
   // 카테고리별 분류
   const sharedVehicles = vehicles.filter((v) => (v.category || "shared") === "shared");
   const personalVehicles = vehicles.filter((v) => v.category === "personal");
-
-  // ========== 차량 폼 공통 컴포넌트 ==========
-  function VehicleForm({
-    form, setForm, onSubmit, submitLabel, onCancel,
-  }: {
-    form: typeof addForm;
-    setForm: React.Dispatch<React.SetStateAction<typeof addForm>>;
-    onSubmit: (e: React.FormEvent) => void;
-    submitLabel: string;
-    onCancel: () => void;
-  }) {
-    return (
-      <form onSubmit={onSubmit} className="card space-y-3 mb-4">
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">차량명 *</label>
-            <input
-              type="text" value={form.name}
-              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-              placeholder="예: 쏠라티 1호차"
-              className="input-field !py-2 text-sm" required
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">차량번호 *</label>
-            <input
-              type="text" value={form.plate_number}
-              onChange={(e) => setForm((p) => ({ ...p, plate_number: e.target.value }))}
-              placeholder="12가 3456"
-              className="input-field !py-2 text-sm" required
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">차종</label>
-            <select
-              value={form.type}
-              onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}
-              className="input-field !py-2 text-sm"
-            >
-              {Object.entries(vehicleTypeLabel).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">분류</label>
-            <select
-              value={form.category}
-              onChange={(e) => setForm((p) => ({ ...p, category: e.target.value as "shared" | "personal" }))}
-              className="input-field !py-2 text-sm"
-            >
-              <option value="shared">공유차량</option>
-              <option value="personal">개인차량</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">연식</label>
-            <input
-              type="number" value={form.year}
-              onChange={(e) => setForm((p) => ({ ...p, year: parseInt(e.target.value) || 2024 }))}
-              className="input-field !py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">정원</label>
-            <input
-              type="number" value={form.capacity}
-              onChange={(e) => setForm((p) => ({ ...p, capacity: parseInt(e.target.value) || 5 }))}
-              className="input-field !py-2 text-sm"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">연령제한</label>
-            <input
-              type="text" value={form.age_limit}
-              onChange={(e) => setForm((p) => ({ ...p, age_limit: e.target.value }))}
-              placeholder="26세 이상"
-              className="input-field !py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">비고</label>
-            <input
-              type="text" value={form.description}
-              onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-              placeholder="참고사항"
-              className="input-field !py-2 text-sm"
-            />
-          </div>
-        </div>
-
-        {/* 보험 정보 */}
-        <div className="border-t border-gray-100 pt-3">
-          <p className="text-xs text-gray-400 mb-2">보험 정보 (선택)</p>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="text" value={form.insurance_company}
-              onChange={(e) => setForm((p) => ({ ...p, insurance_company: e.target.value }))}
-              placeholder="보험사" className="input-field !py-2 text-sm"
-            />
-            <input
-              type="text" value={form.insurance_phone}
-              onChange={(e) => setForm((p) => ({ ...p, insurance_phone: e.target.value }))}
-              placeholder="사고접수 번호" className="input-field !py-2 text-sm"
-            />
-          </div>
-          <div className="grid grid-cols-3 gap-2 mt-2">
-            <input
-              type="date" value={form.insurance_expiry}
-              onChange={(e) => setForm((p) => ({ ...p, insurance_expiry: e.target.value }))}
-              className="input-field !py-2 text-sm" title="보험만기일"
-            />
-            <input
-              type="text" value={form.insurance_agent}
-              onChange={(e) => setForm((p) => ({ ...p, insurance_agent: e.target.value }))}
-              placeholder="설계사" className="input-field !py-2 text-sm"
-            />
-            <input
-              type="text" value={form.insurance_agent_phone}
-              onChange={(e) => setForm((p) => ({ ...p, insurance_agent_phone: e.target.value }))}
-              placeholder="설계사 연락처" className="input-field !py-2 text-sm"
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-2 pt-1">
-          <button type="button" onClick={onCancel} className="btn-outline !py-2 text-sm">
-            취소
-          </button>
-          <button type="submit" className="btn-primary !py-2 text-sm">
-            {submitLabel}
-          </button>
-        </div>
-      </form>
-    );
-  }
-
-  // ========== 차량 카드 컴포넌트 ==========
-  function VehicleCard({ v }: { v: Vehicle }) {
-    const status = getVehicleStatus(v);
-    const cfg = statusConfig[status];
-
-    return (
-      <div className="card !p-3">
-        <div className="flex items-center justify-between">
-          <button onClick={() => loadVehicleDetail(v)} className="flex-1 text-left">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">
-                {v.type === "bus" ? "🚌" : v.type === "van" ? "🚐" : v.type === "truck" ? "🚛" : "🚗"}
-              </span>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <h4 className="font-bold text-sm text-gray-900">{v.name}</h4>
-                  {v.category === "personal" && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
-                      개인
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-gray-400">
-                  {v.plate_number} · {v.year}년식 · {v.capacity}인승
-                </p>
-              </div>
-            </div>
-          </button>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${cfg.bg} ${cfg.text}`}>
-              {cfg.label}
-            </span>
-            {status !== "in_use" && (
-              <button
-                onClick={() => toggleAvailable(v)}
-                className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
-                  v.available
-                    ? "border-red-200 text-red-500 hover:bg-red-50"
-                    : "border-green-200 text-green-600 hover:bg-green-50"
-                }`}
-              >
-                {v.available ? "사용불가로" : "사용가능으로"}
-              </button>
-            )}
-          </div>
-        </div>
-        {v.insurance_company && (
-          <div className="mt-1.5 text-[10px] text-gray-400">
-            보험: {v.insurance_company} (만기: {v.insurance_expiry})
-          </div>
-        )}
-      </div>
-    );
-  }
 
   // ========== 리스트 뷰 ==========
   if (viewMode === "list") {
@@ -593,7 +677,13 @@ export default function VehicleManagement() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {sharedVehicles.map((v) => (
-                    <VehicleCard key={v.id} v={v} />
+                    <VehicleCard
+                      key={v.id}
+                      v={v}
+                      status={getVehicleStatus(v)}
+                      onLoadDetail={loadVehicleDetail}
+                      onToggleAvailable={toggleAvailable}
+                    />
                   ))}
                 </div>
               )}
@@ -613,7 +703,13 @@ export default function VehicleManagement() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {personalVehicles.map((v) => (
-                    <VehicleCard key={v.id} v={v} />
+                    <VehicleCard
+                      key={v.id}
+                      v={v}
+                      status={getVehicleStatus(v)}
+                      onLoadDetail={loadVehicleDetail}
+                      onToggleAvailable={toggleAvailable}
+                    />
                   ))}
                 </div>
               </div>
@@ -634,7 +730,11 @@ export default function VehicleManagement() {
     <div>
       {/* 뒤로가기 */}
       <button
-        onClick={() => { setViewMode("list"); setSelectedVehicle(null); setEditingInfo(false); }}
+        onClick={() => {
+          setViewMode("list");
+          setSelectedVehicle(null);
+          setEditingInfo(false);
+        }}
         className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -647,7 +747,13 @@ export default function VehicleManagement() {
       <div className="card mb-4">
         <div className="flex items-center gap-3">
           <span className="text-3xl">
-            {selectedVehicle.type === "bus" ? "🚌" : selectedVehicle.type === "van" ? "🚐" : selectedVehicle.type === "truck" ? "🚛" : "🚗"}
+            {selectedVehicle.type === "bus"
+              ? "🚌"
+              : selectedVehicle.type === "van"
+                ? "🚐"
+                : selectedVehicle.type === "truck"
+                  ? "🚛"
+                  : "🚗"}
           </span>
           <div className="flex-1">
             <div className="flex items-center gap-2 flex-wrap">
@@ -655,16 +761,19 @@ export default function VehicleManagement() {
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${selectedCfg.bg} ${selectedCfg.text}`}>
                 {selectedCfg.label}
               </span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                (selectedVehicle.category || "shared") === "shared"
-                  ? "bg-blue-50 text-blue-600"
-                  : "bg-amber-100 text-amber-700"
-              }`}>
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                  (selectedVehicle.category || "shared") === "shared"
+                    ? "bg-blue-50 text-blue-600"
+                    : "bg-amber-100 text-amber-700"
+                }`}
+              >
                 {categoryLabel[selectedVehicle.category || "shared"]}
               </span>
             </div>
             <p className="text-sm text-gray-500">
-              {selectedVehicle.plate_number} · {selectedVehicle.year}년식 · {vehicleTypeLabel[selectedVehicle.type]} · {selectedVehicle.capacity}인승
+              {selectedVehicle.plate_number} · {selectedVehicle.year}년식 · {vehicleTypeLabel[selectedVehicle.type]} ·
+              {selectedVehicle.capacity}인승
             </p>
           </div>
         </div>
@@ -672,14 +781,20 @@ export default function VehicleManagement() {
 
       {/* 탭 */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4">
-        {([
-          { key: "info", label: "기본정보" },
-          { key: "insurance", label: "보험내역" },
-          { key: "maintenance", label: "정비내역" },
-        ] as { key: DetailTab; label: string }[]).map((tab) => (
+        {(
+          [
+            { key: "info", label: "기본정보" },
+            { key: "insurance", label: "보험내역" },
+            { key: "maintenance", label: "정비내역" },
+            { key: "history", label: "사용기록" },
+          ] as { key: DetailTab; label: string }[]
+        ).map((tab) => (
           <button
             key={tab.key}
-            onClick={() => { setDetailTab(tab.key); setEditingInfo(false); }}
+            onClick={() => {
+              setDetailTab(tab.key);
+              setEditingInfo(false);
+            }}
             className={`flex-1 py-2 px-2 text-sm font-medium rounded-lg transition-all ${
               detailTab === tab.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
             }`}
@@ -704,15 +819,16 @@ export default function VehicleManagement() {
                 <InfoRow label="연식" value={`${selectedVehicle.year}년`} />
                 <InfoRow label="승차정원" value={`${selectedVehicle.capacity}명`} />
                 <InfoRow label="연령제한" value={selectedVehicle.age_limit || "-"} />
-                {selectedVehicle.description && (
-                  <InfoRow label="비고" value={selectedVehicle.description} />
-                )}
+                {selectedVehicle.description && <InfoRow label="비고" value={selectedVehicle.description} />}
                 <div className="border-t border-gray-100 pt-2 mt-2">
                   <p className="text-xs text-gray-400 mb-1">현재 보험</p>
                   <InfoRow label="보험사" value={selectedVehicle.insurance_company || "-"} />
                   <InfoRow label="사고접수" value={selectedVehicle.insurance_phone || "-"} />
                   <InfoRow label="만기일" value={selectedVehicle.insurance_expiry || "-"} />
-                  <InfoRow label="설계사" value={`${selectedVehicle.insurance_agent || "-"} (${selectedVehicle.insurance_agent_phone || "-"})`} />
+                  <InfoRow
+                    label="설계사"
+                    value={`${selectedVehicle.insurance_agent || "-"} (${selectedVehicle.insurance_agent_phone || "-"})`}
+                  />
                 </div>
               </div>
               <div className="flex gap-2 mt-3">
@@ -772,7 +888,9 @@ export default function VehicleManagement() {
                     <input name="premium" type="number" placeholder="보험료(원)" className="input-field text-sm" />
                   </div>
                   <input name="memo" placeholder="메모" className="input-field text-sm" />
-                  <button type="submit" className="btn-primary text-sm !py-2">저장</button>
+                  <button type="submit" className="btn-primary text-sm !py-2">
+                    저장
+                  </button>
                 </form>
               )}
 
@@ -787,7 +905,9 @@ export default function VehicleManagement() {
                           <span className="font-bold text-sm text-gray-900">{ins.insurance_company}</span>
                           <span className="text-xs text-gray-400 ml-2">{ins.coverage_type}</span>
                         </div>
-                        <button onClick={() => deleteInsurance(ins.id)} className="text-xs text-red-400">삭제</button>
+                        <button onClick={() => deleteInsurance(ins.id)} className="text-xs text-red-400">
+                          삭제
+                        </button>
                       </div>
                       <div className="text-xs text-gray-500 space-y-0.5">
                         <div>만기: {ins.end_date}</div>
@@ -822,7 +942,9 @@ export default function VehicleManagement() {
                     <input name="date" type="date" required className="input-field text-sm" />
                     <select name="type" className="input-field text-sm">
                       {Object.entries(maintenanceTypeLabel).map(([k, v]) => (
-                        <option key={k} value={k}>{v}</option>
+                        <option key={k} value={k}>
+                          {v}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -833,7 +955,9 @@ export default function VehicleManagement() {
                   </div>
                   <input name="shop" placeholder="정비소" className="input-field text-sm" />
                   <input name="memo" placeholder="메모" className="input-field text-sm" />
-                  <button type="submit" className="btn-primary text-sm !py-2">저장</button>
+                  <button type="submit" className="btn-primary text-sm !py-2">
+                    저장
+                  </button>
                 </form>
               )}
 
@@ -850,7 +974,9 @@ export default function VehicleManagement() {
                           </span>
                           <span className="font-bold text-sm text-gray-900">{m.description}</span>
                         </div>
-                        <button onClick={() => deleteMaintenance(m.id)} className="text-xs text-red-400">삭제</button>
+                        <button onClick={() => deleteMaintenance(m.id)} className="text-xs text-red-400">
+                          삭제
+                        </button>
                       </div>
                       <div className="text-xs text-gray-500 space-y-0.5">
                         <div>날짜: {m.maintenance_date}</div>
@@ -865,17 +991,39 @@ export default function VehicleManagement() {
               )}
             </div>
           )}
+
+          {/* ===== 사용기록 탭 ===== */}
+          {detailTab === "history" && (
+            <div>
+              <p className="text-sm text-gray-500 mb-3">{usageHistory.length}건</p>
+
+              {usageHistory.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 text-sm">사용 기록이 없습니다</div>
+              ) : (
+                <div className="space-y-2">
+                  {usageHistory.map((res) => (
+                    <div key={res.id} className="card !p-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-2">
+                          <StatusBadge status={res.status} />
+                          <span className="font-bold text-sm text-gray-900">{res.guest_name}</span>
+                        </div>
+                        <span className="text-xs text-gray-400">{res.department}</span>
+                      </div>
+                      <div className="text-xs text-gray-500 space-y-0.5">
+                        <div>
+                          기간: {res.start_date} ~ {res.end_date}
+                        </div>
+                        {res.purpose && <div>용도: {res.purpose}</div>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
-    </div>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className="text-gray-900 font-medium">{value}</span>
     </div>
   );
 }
