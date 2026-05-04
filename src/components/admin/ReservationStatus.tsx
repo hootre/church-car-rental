@@ -36,6 +36,16 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
     return admin ? admin.name : "";
   }
 
+  const statusOrder: Record<string, number> = {
+    pending: 0,
+    staff_approved: 1,
+    approved: 2,
+    in_use: 3,
+    returned: 4,
+    cancelled: 5,
+    rejected: 6,
+  };
+
   const fetchReservations = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -47,7 +57,12 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
     if (error) {
       toast.error("예약 목록을 불러오지 못했습니다");
     } else {
-      setReservations(data || []);
+      const sorted = (data || []).sort((a, b) => {
+        const diff = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
+        if (diff !== 0) return diff;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      setReservations(sorted);
     }
   }, []);
 

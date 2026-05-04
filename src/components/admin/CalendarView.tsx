@@ -16,6 +16,7 @@ const dotColor: Record<string, string> = {
   in_use: "bg-blue-400",
   returned: "bg-purple-400",
   rejected: "bg-red-300",
+  cancelled: "bg-orange-300",
 };
 
 // 상태별 이벤트 바 색상 (데스크탑용 - 고채도)
@@ -26,6 +27,7 @@ const barColor: Record<string, string> = {
   in_use: "bg-blue-300 text-blue-900",
   returned: "bg-purple-300 text-purple-900",
   rejected: "bg-red-300 text-red-900",
+  cancelled: "bg-orange-300 text-orange-900",
 };
 
 interface EventBar {

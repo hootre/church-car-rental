@@ -20,6 +20,7 @@ export const statusLabel: Record<string, string> = {
   staff_approved: "차량담당 장로 승인",
   approved: "승인완료",
   rejected: "거절",
+  cancelled: "예약취소",
   in_use: "대여중",
   returned: "반납완료",
 };
@@ -29,6 +30,7 @@ export const statusColor: Record<string, string> = {
   staff_approved: "bg-emerald-100 text-emerald-800",
   approved: "bg-green-100 text-green-800",
   rejected: "bg-red-100 text-red-800",
+  cancelled: "bg-orange-100 text-orange-800",
   in_use: "bg-blue-100 text-blue-800",
   returned: "bg-purple-100 text-purple-800",
 };
@@ -41,6 +43,7 @@ export const statusTransitions: Record<string, string[]> = {
   approved: ["in_use", "rejected"],
   in_use: ["returned"],
   rejected: [],
+  cancelled: [],
   returned: [],
 };
 

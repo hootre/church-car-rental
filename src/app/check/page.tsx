@@ -98,6 +98,26 @@ export default function CheckPage() {
     }
   }
 
+  // 예약 취소 (pending, staff_approved만 가능)
+  async function handleCancel(reservation: Reservation) {
+    if (!confirm("예약을 취소하시겠습니까?")) return;
+
+    const { error } = await supabase
+      .from("reservations")
+      .update({
+        status: "cancelled",
+        admin_note: `[대여자 본인 취소] ${reservation.admin_note || ""}`.trim(),
+      })
+      .eq("id", reservation.id);
+
+    if (error) {
+      toast.error("예약 취소에 실패했습니다");
+    } else {
+      toast.success("예약이 취소되었습니다");
+      fetchReservations();
+    }
+  }
+
   // 상태별 안내 메시지
   function getStatusGuide(status: string) {
     switch (status) {
@@ -113,6 +133,8 @@ export default function CheckPage() {
         return "반납이 완료되었습니다. 이용해 주셔서 감사합니다";
       case "rejected":
         return "예약이 거절되었습니다";
+      case "cancelled":
+        return "예약이 취소되었습니다";
       default:
         return "";
     }
@@ -275,6 +297,17 @@ export default function CheckPage() {
                           value={new Date(r.created_at).toLocaleDateString("ko-KR")}
                         />
                       </div>
+
+                      {/* ===== 대기/1차승인: 예약 취소 ===== */}
+                      {(r.status === "pending" || r.status === "staff_approved") && (
+                        <button
+                          onClick={() => handleCancel(r)}
+                          className="w-full py-3 bg-orange-500 text-white font-semibold rounded-xl
+                                     hover:bg-orange-600 active:bg-orange-700 transition-colors"
+                        >
+                          예약취소
+                        </button>
+                      )}
 
                       {/* ===== 승인됨: 대여 사진 업로드 + 대여 시작 ===== */}
                       {r.status === "approved" && (

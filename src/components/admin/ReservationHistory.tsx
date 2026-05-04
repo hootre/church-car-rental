@@ -48,6 +48,16 @@ export default function ReservationHistory() {
   }
 
   // 예약 내역 조회
+  const statusOrder: Record<string, number> = {
+    pending: 0,
+    staff_approved: 1,
+    approved: 2,
+    in_use: 3,
+    returned: 4,
+    cancelled: 5,
+    rejected: 6,
+  };
+
   const fetchReservations = useCallback(async () => {
     setLoading(true);
     let query = supabase
@@ -76,6 +86,11 @@ export default function ReservationHistory() {
             r.department.toLowerCase().includes(keyword)
         );
       }
+      filtered.sort((a, b) => {
+        const diff = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
+        if (diff !== 0) return diff;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
       setReservations(filtered);
     }
   }, [filterStatus, filterVehicle, filterDateFrom, filterDateTo, searchName]);
@@ -346,6 +361,7 @@ export default function ReservationHistory() {
                   <option value="approved">승인완료</option>
                   <option value="in_use">대여중</option>
                   <option value="returned">반납완료</option>
+                  <option value="cancelled">예약취소</option>
                   <option value="rejected">거절</option>
                 </select>
               </div>
