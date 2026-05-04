@@ -18,14 +18,14 @@ const dotColor: Record<string, string> = {
   rejected: "bg-red-300",
 };
 
-// 상태별 이벤트 태그 배경색
-const eventPillColor: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-700",
-  staff_approved: "bg-emerald-100 text-emerald-700",
-  approved: "bg-green-100 text-green-700",
-  in_use: "bg-blue-100 text-blue-700",
-  returned: "bg-purple-100 text-purple-700",
-  rejected: "bg-red-100 text-red-700",
+// 상태별 이벤트 바 색상 (데스크탑용)
+const barColor: Record<string, string> = {
+  pending: "bg-yellow-200 text-yellow-800 border border-yellow-300",
+  staff_approved: "bg-emerald-200 text-emerald-800 border border-emerald-300",
+  approved: "bg-green-200 text-green-800 border border-green-300",
+  in_use: "bg-blue-200 text-blue-800 border border-blue-300",
+  returned: "bg-purple-200 text-purple-800 border border-purple-300",
+  rejected: "bg-red-200 text-red-800 border border-red-300",
 };
 
 interface EventBar {
@@ -34,8 +34,8 @@ interface EventBar {
   startCol: number;
   endCol: number;
   lane: number;
-  startsInWeek: boolean;
-  endsInWeek: boolean;
+  isStart: boolean;
+  isEnd: boolean;
 }
 
 export default function CalendarView() {
@@ -128,78 +128,67 @@ export default function CalendarView() {
 
   // 각 주별 이벤트 바 계산
   const weekEventBars = useMemo(() => {
-    const bars: EventBar[][] = [];
+    const allBars: EventBar[][] = [];
 
-    for (let weekIdx = 0; weekIdx < calendarDays.length / 7; weekIdx++) {
+    for (let weekIdx = 0; weekIdx < 6; weekIdx++) {
       const weekStart = weekIdx * 7;
-      const weekEnd = weekStart + 7;
-      const weekDays = calendarDays.slice(weekStart, weekEnd);
+      const weekDays = calendarDays.slice(weekStart, weekStart + 7);
 
       // 이 주와 겹치는 모든 예약 찾기
-      const intersectingReservations = new Set<Reservation>();
+      const seen = new Set<string>();
+      const intersecting: Reservation[] = [];
 
       weekDays.forEach((day) => {
         const dateStr = day.date.toISOString().split("T")[0];
-        const dayResevations = reservationsByDate[dateStr] || [];
-        dayResevations.forEach((r) => intersectingReservations.add(r));
+        const dayRes = reservationsByDate[dateStr] || [];
+        dayRes.forEach((r) => {
+          if (!seen.has(r.id)) {
+            seen.add(r.id);
+            intersecting.push(r);
+          }
+        });
       });
 
-      // 각 예약에 대해 시작/종료 열 계산 및 레인 할당
+      // 각 예약에 대해 바 정보 계산
       const weekBars: EventBar[] = [];
-      const laneMap = new Map<string, number>();
 
-      Array.from(intersectingReservations).forEach((reservation) => {
+      intersecting.forEach((reservation) => {
         const resStart = new Date(reservation.start_date + "T00:00:00");
         const resEnd = new Date(reservation.end_date + "T00:00:00");
         const weekStartDate = weekDays[0].date;
         const weekEndDate = weekDays[6].date;
 
-        // 이 주에서의 시작/종료 열
         let startCol = 0;
         let endCol = 6;
-        let startsInWeek = false;
-        let endsInWeek = false;
+        let isStart = false;
+        let isEnd = false;
 
         if (resStart >= weekStartDate && resStart <= weekEndDate) {
-          startCol = resStart.getDay();
-          startsInWeek = true;
+          startCol = Math.round((resStart.getTime() - weekStartDate.getTime()) / (1000 * 60 * 60 * 24));
+          isStart = true;
         }
 
         if (resEnd >= weekStartDate && resEnd <= weekEndDate) {
-          endCol = resEnd.getDay();
-          endsInWeek = true;
+          endCol = Math.round((resEnd.getTime() - weekStartDate.getTime()) / (1000 * 60 * 60 * 24));
+          isEnd = true;
         }
 
-        if (resStart < weekStartDate) {
-          startCol = 0;
-        }
-
-        if (resEnd > weekEndDate) {
-          endCol = 6;
-        }
-
-        // 레인 할당 (겹치는 다른 바들과의 충돌 확인)
+        // 레인 할당
         let lane = 0;
         let assigned = false;
 
         while (!assigned) {
           let conflict = false;
-
-          for (const existingBar of weekBars) {
-            if (existingBar.lane === lane) {
-              // 이 레인의 다른 바와 겹치는지 확인
-              if (
-                !(existingBar.endCol < startCol || existingBar.startCol > endCol)
-              ) {
+          for (const existing of weekBars) {
+            if (existing.lane === lane) {
+              if (!(existing.endCol < startCol || existing.startCol > endCol)) {
                 conflict = true;
                 break;
               }
             }
           }
-
           if (!conflict) {
             assigned = true;
-            laneMap.set(reservation.id, lane);
           } else {
             lane++;
           }
@@ -211,15 +200,15 @@ export default function CalendarView() {
           startCol,
           endCol,
           lane,
-          startsInWeek,
-          endsInWeek,
+          isStart,
+          isEnd,
         });
       });
 
-      bars.push(weekBars);
+      allBars.push(weekBars);
     }
 
-    return bars;
+    return allBars;
   }, [calendarDays, reservationsByDate]);
 
   function goToPrevMonth() {
@@ -311,123 +300,123 @@ export default function CalendarView() {
         {loading ? (
           <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
         ) : (
-          <div className="grid grid-cols-7">
-            {calendarDays.map(({ date, isCurrentMonth }, idx) => {
-              const dateStr = date.toISOString().split("T")[0];
-              const dayReservations = reservationsByDate[dateStr] || [];
-              const isToday = dateStr === todayStr;
-              const isSelected = dateStr === selectedDate;
-              const dayOfWeek = date.getDay();
-              const weekIdx = Math.floor(idx / 7);
+          <div>
+            {/* 주 단위로 렌더링 */}
+            {Array.from({ length: 6 }).map((_, weekIdx) => {
+              const weekDays = calendarDays.slice(weekIdx * 7, weekIdx * 7 + 7);
+              const bars = weekEventBars[weekIdx] || [];
+              const maxLane = bars.length > 0 ? Math.max(...bars.map((b) => b.lane)) : -1;
+              const barLaneCount = Math.min(maxLane + 1, 3); // 최대 3줄까지 표시
 
               return (
-                <button
-                  key={idx}
-                  onClick={() => setSelectedDate(isSelected ? null : dateStr)}
-                  className={`relative p-2 md:p-3 min-h-[52px] md:min-h-[100px] border-r border-b border-gray-200
-                              flex flex-col items-start transition-colors
-                              ${isCurrentMonth ? "" : "opacity-30 bg-gray-50"}
-                              ${isSelected ? "bg-primary-50" : "hover:bg-gray-50"}
-                              ${
-                                idx % 7 === 6 ? "border-r-0" : ""
-                              }
-                              ${idx + 7 > calendarDays.length - 1 ? "border-b-0" : ""}
-                  `}
-                >
-                  {/* 날짜 번호 */}
-                  <div className="mb-1 md:mb-2 w-full">
-                    <span
-                      className={`inline-flex text-xs md:text-sm leading-none px-1.5 py-0.5 rounded-full
-                        ${isToday ? "bg-primary-600 text-white font-bold" : ""}
-                        ${!isToday && dayOfWeek === 0 ? "text-red-400" : ""}
-                        ${!isToday && dayOfWeek === 6 ? "text-blue-400" : ""}
-                        ${!isToday && dayOfWeek !== 0 && dayOfWeek !== 6 ? "text-gray-700" : ""}
-                      `}
-                    >
-                      {date.getDate()}
-                    </span>
+                <div key={weekIdx}>
+                  {/* 날짜 행 */}
+                  <div className="grid grid-cols-7">
+                    {weekDays.map((dayInfo, colIdx) => {
+                      const { date, isCurrentMonth } = dayInfo;
+                      const dateStr = date.toISOString().split("T")[0];
+                      const dayReservations = reservationsByDate[dateStr] || [];
+                      const isToday = dateStr === todayStr;
+                      const isSelected = dateStr === selectedDate;
+                      const dayOfWeek = date.getDay();
+
+                      return (
+                        <button
+                          key={colIdx}
+                          onClick={() => setSelectedDate(isSelected ? null : dateStr)}
+                          className={`relative p-1.5 md:p-2 min-h-[44px] md:min-h-[36px] border-r border-b border-gray-100
+                                      flex flex-col items-center transition-colors
+                                      ${isCurrentMonth ? "" : "opacity-30 bg-gray-50"}
+                                      ${isSelected ? "bg-primary-50" : "hover:bg-gray-50"}
+                                      ${colIdx === 6 ? "border-r-0" : ""}
+                          `}
+                        >
+                          <span
+                            className={`text-xs md:text-sm leading-none px-1.5 py-0.5 rounded-full
+                              ${isToday ? "bg-primary-600 text-white font-bold" : ""}
+                              ${!isToday && dayOfWeek === 0 ? "text-red-400" : ""}
+                              ${!isToday && dayOfWeek === 6 ? "text-blue-400" : ""}
+                              ${!isToday && dayOfWeek !== 0 && dayOfWeek !== 6 ? "text-gray-700" : ""}
+                            `}
+                          >
+                            {date.getDate()}
+                          </span>
+
+                          {/* 모바일: 도트 표시 */}
+                          {dayReservations.length > 0 && (
+                            <div className="md:hidden flex flex-wrap gap-[2px] mt-1 justify-center">
+                              {dayReservations.length <= 3 ? (
+                                dayReservations.map((r, i) => (
+                                  <div
+                                    key={i}
+                                    className={`w-[5px] h-[5px] rounded-full ${dotColor[r.status] || "bg-gray-300"}`}
+                                  />
+                                ))
+                              ) : (
+                                <>
+                                  <div className={`w-[5px] h-[5px] rounded-full ${dotColor[dayReservations[0].status]}`} />
+                                  <div className={`w-[5px] h-[5px] rounded-full ${dotColor[dayReservations[1].status]}`} />
+                                  <span className="text-[8px] text-gray-400 leading-none">
+                                    +{dayReservations.length - 2}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  {/* 모바일: 도트 표시 */}
-                  {dayReservations.length > 0 && (
-                    <div className="md:hidden flex flex-wrap gap-[2px] w-full">
-                      {dayReservations.length <= 3 ? (
-                        dayReservations.map((r, i) => (
-                          <div
-                            key={i}
-                            className={`w-[5px] h-[5px] rounded-full ${dotColor[r.status] || "bg-gray-300"}`}
-                          />
-                        ))
-                      ) : (
-                        <>
-                          <div className={`w-[5px] h-[5px] rounded-full ${dotColor[dayReservations[0].status]}`} />
-                          <div className={`w-[5px] h-[5px] rounded-full ${dotColor[dayReservations[1].status]}`} />
-                          <span className="text-[8px] text-gray-400 leading-none">
-                            +{dayReservations.length - 2}
-                          </span>
-                        </>
+                  {/* 데스크탑: 이벤트 바 행 (주 내 통합) */}
+                  {barLaneCount > 0 && (
+                    <div className="hidden md:block relative border-b border-gray-100" style={{ height: `${barLaneCount * 22 + 4}px` }}>
+                      {bars
+                        .filter((bar) => bar.lane < 3)
+                        .map((bar) => {
+                          const span = bar.endCol - bar.startCol + 1;
+                          const leftPercent = (bar.startCol / 7) * 100;
+                          const widthPercent = (span / 7) * 100;
+
+                          let roundedClass = "rounded";
+                          if (bar.isStart && bar.isEnd) roundedClass = "rounded";
+                          else if (bar.isStart && !bar.isEnd) roundedClass = "rounded-l";
+                          else if (!bar.isStart && bar.isEnd) roundedClass = "rounded-r";
+                          else roundedClass = "rounded-none";
+
+                          return (
+                            <div
+                              key={bar.id}
+                              className={`absolute h-[18px] flex items-center px-1.5 text-[10px] font-medium truncate
+                                ${barColor[bar.reservation.status] || "bg-gray-200 text-gray-700 border border-gray-300"}
+                                ${roundedClass}
+                              `}
+                              style={{
+                                top: `${bar.lane * 22 + 2}px`,
+                                left: `${leftPercent}%`,
+                                width: `${widthPercent}%`,
+                              }}
+                              title={`${bar.reservation.vehicles?.name || "차량"} - ${bar.reservation.guest_name} (${bar.reservation.start_date} ~ ${bar.reservation.end_date})`}
+                            >
+                              {bar.reservation.vehicles?.name} {bar.reservation.guest_name}
+                            </div>
+                          );
+                        })}
+                      {bars.length > 3 && maxLane >= 3 && (
+                        <div
+                          className="absolute right-1 text-[9px] text-gray-400"
+                          style={{ top: `${3 * 22 - 4}px` }}
+                        >
+                          +{bars.filter((b) => b.lane >= 3).length}
+                        </div>
                       )}
                     </div>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
         )}
-      </div>
-
-      {/* 데스크탑: 멀티데이 예약 바 오버레이 */}
-      <div className="hidden md:block mb-4 space-y-2">
-        {weekEventBars.map((weekBars, weekIdx) => {
-          const weekStart = weekIdx * 7;
-          const visibleBars = weekBars.slice(0, 3);
-          const hiddenCount = weekBars.length > 3 ? weekBars.length - 3 : 0;
-
-          return (
-            <div key={`week-${weekIdx}`} className="space-y-1">
-              {visibleBars.map((bar) => {
-                const widthPercent = ((bar.endCol - bar.startCol + 1) / 7) * 100;
-                const leftPercent = (bar.startCol / 7) * 100;
-
-                let borderRadius = "rounded";
-                if (bar.startsInWeek && bar.endsInWeek) {
-                  borderRadius = "rounded";
-                } else if (bar.startsInWeek) {
-                  borderRadius = "rounded-l";
-                } else if (bar.endsInWeek) {
-                  borderRadius = "rounded-r";
-                } else {
-                  borderRadius = "";
-                }
-
-                return (
-                  <div
-                    key={bar.id}
-                    className="relative h-6 flex items-center"
-                    style={{ paddingLeft: `${leftPercent}%` }}
-                  >
-                    <div
-                      className={`h-5 flex items-center px-2 py-0.5 text-[10px] font-medium whitespace-nowrap overflow-hidden
-                        ${eventPillColor[bar.reservation.status] || "bg-gray-100 text-gray-700"}
-                        ${borderRadius}
-                      `}
-                      style={{ width: `${widthPercent}%` }}
-                      title={`${bar.reservation.vehicles?.name || "차량"} ${bar.reservation.guest_name}`}
-                    >
-                      {bar.reservation.vehicles?.name} {bar.reservation.guest_name}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {hiddenCount > 0 && (
-                <div className="text-[10px] text-gray-500 px-3 py-1">
-                  +{hiddenCount} more
-                </div>
-              )}
-            </div>
-          );
-        })}
       </div>
 
       {/* 이번 달 요약 */}

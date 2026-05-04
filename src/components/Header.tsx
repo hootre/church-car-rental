@@ -18,7 +18,7 @@ export default function Header() {
             height={18}
             className="h-5 w-auto object-contain"
           />
-          <span className="text-primary-600 font-bold text-lg">차량대여</span>
+          <span className="text-primary-600 font-bold text-lg">차량부</span>
         </Link>
       </div>
 

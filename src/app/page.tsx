@@ -84,12 +84,20 @@ export default function HomePage() {
         </div>
 
         {/* 담당 연락처 */}
-        <div className="mt-4 p-4 bg-gray-50 rounded-2xl text-center">
+        <div className="mt-4 p-4 bg-gray-50 rounded-2xl text-center space-y-3">
           <p className="text-sm font-semibold text-gray-700 mb-1">담당연락처</p>
-          <p className="text-sm text-gray-600">이학수 안수집사</p>
-          <a href="tel:010-8760-9338" className="text-primary-600 font-bold text-lg">
-            010-8760-9338
-          </a>
+          <div>
+            <p className="text-sm text-gray-600">이학수 안수집사</p>
+            <a href="tel:010-8760-9338" className="text-primary-600 font-bold text-lg">
+              010-8760-9338
+            </a>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">전종수 장로</p>
+            <a href="tel:010-7737-1895" className="text-primary-600 font-bold text-lg">
+              010-7737-1895
+            </a>
+          </div>
         </div>
       </main>
     </div>
