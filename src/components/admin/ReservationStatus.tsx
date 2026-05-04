@@ -57,7 +57,9 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
     if (error) {
       toast.error("예약 목록을 불러오지 못했습니다");
     } else {
-      const sorted = (data || []).sort((a, b) => {
+      // 예약취소(cancelled)는 예약현황에서 제외 → 예약내역에서만 확인
+      const filtered = (data || []).filter((r) => r.status !== "cancelled");
+      const sorted = filtered.sort((a, b) => {
         const diff = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
         if (diff !== 0) return diff;
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();

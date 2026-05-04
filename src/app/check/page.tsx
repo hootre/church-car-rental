@@ -33,7 +33,9 @@ export default function CheckPage() {
       toast.error("조회에 실패했습니다");
       console.error(error);
     } else {
-      setReservations(data || []);
+      // 취소된 예약은 대여자 조회에서 숨김
+      const visible = (data || []).filter((r) => r.status !== "cancelled");
+      setReservations(visible);
     }
   }, [phone, name]);
 
