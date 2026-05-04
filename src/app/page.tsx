@@ -75,28 +75,17 @@ export default function HomePage() {
 
         {/* 이용 안내 */}
         <div className="mt-8 p-4 bg-blue-50 rounded-2xl">
-          <h3 className="font-semibold text-primary-800 text-sm mb-2">이용 안내</h3>
-          <ul className="text-xs text-primary-700 space-y-1">
+          <h3 className="font-semibold text-primary-800 text-sm mb-2">이용안내</h3>
+          <ul className="text-xs text-primary-700 space-y-1.5">
+            <li>• 차량은 2주일 전 신청을 원칙으로 합니다</li>
             <li>• 예약 신청 후 관리자 승인이 필요합니다</li>
             <li>• 차량 사용 후 원래 주차 위치에 반납해 주세요</li>
             <li>• 사용 중 문제 발생 시 차량부로 연락 바랍니다</li>
           </ul>
-        </div>
-
-        {/* 담당 연락처 */}
-        <div className="mt-4 p-4 bg-gray-50 rounded-2xl text-center space-y-3">
-          <p className="text-sm font-semibold text-gray-700 mb-1">담당연락처</p>
-          <div>
-            <p className="text-sm text-gray-600">이학수 안수집사</p>
-            <a href="tel:010-8760-9338" className="text-primary-600 font-bold text-lg">
-              010-8760-9338
-            </a>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">전종수 장로</p>
-            <a href="tel:010-7737-1895" className="text-primary-600 font-bold text-lg">
-              010-7737-1895
-            </a>
+          <div className="mt-3 pt-3 border-t border-blue-100 text-xs text-primary-700 space-y-1">
+            <p className="font-semibold">담당연락처</p>
+            <p>이학수 안수집사: <a href="tel:010-8760-9338" className="font-bold underline">010-8760-9338</a></p>
+            <p>전종수 장로: <a href="tel:010-7737-1895" className="font-bold underline">010-7737-1895</a></p>
           </div>
         </div>
       </main>
