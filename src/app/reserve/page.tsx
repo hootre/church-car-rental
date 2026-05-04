@@ -177,11 +177,11 @@ export default function ReservePage() {
       <Header />
       <main className="max-w-lg mx-auto px-4 pt-6">
         {/* 스텝 인디케이터 */}
-        <div className="flex items-center justify-center mb-6 px-2">
+        <div className="flex items-center justify-center mb-6">
           {steps.map((s, i) => (
-            <div key={s} className="flex items-center flex-1 max-w-[72px]">
+            <div key={s} className={`flex items-center ${i < steps.length - 1 ? "flex-1 max-w-[80px]" : ""}`}>
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${
+                className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${
                   step === s
                     ? "bg-primary-600 text-white"
                     : i < steps.indexOf(step)
@@ -191,7 +191,7 @@ export default function ReservePage() {
               >
                 {i + 1}
               </div>
-              {i < steps.length - 1 && <div className="flex-1 h-0.5 bg-gray-200 rounded mx-1" />}
+              {i < steps.length - 1 && <div className="flex-1 h-0.5 bg-gray-200 rounded mx-2" />}
             </div>
           ))}
         </div>
