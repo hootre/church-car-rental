@@ -177,9 +177,9 @@ export default function ReservePage() {
       <Header />
       <main className="max-w-lg mx-auto px-4 pt-6">
         {/* 스텝 인디케이터 */}
-        <div className="flex items-center gap-2 mb-6">
+        <div className="flex items-center justify-center gap-2 mb-6">
           {steps.map((s, i) => (
-            <div key={s} className="flex items-center gap-2 flex-1">
+            <div key={s} className="flex items-center gap-2 flex-1 max-w-[80px]">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
                   step === s

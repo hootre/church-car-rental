@@ -324,7 +324,7 @@ export default function CalendarView() {
                         <button
                           key={colIdx}
                           onClick={() => setSelectedDate(isSelected ? null : dateStr)}
-                          className={`relative p-1.5 md:p-2 min-h-[44px] md:min-h-[36px] border-r border-b border-gray-100
+                          className={`relative p-1.5 md:p-2 min-h-[44px] md:min-h-[36px] border-r border-b border-gray-200
                                       flex flex-col items-center transition-colors
                                       ${isCurrentMonth ? "" : "opacity-30 bg-gray-50"}
                                       ${isSelected ? "bg-primary-50" : "hover:bg-gray-50"}
@@ -370,7 +370,7 @@ export default function CalendarView() {
 
                   {/* 데스크탑: 이벤트 바 행 (주 내 통합) */}
                   {barLaneCount > 0 && (
-                    <div className="hidden md:block relative border-b border-gray-100" style={{ height: `${barLaneCount * 22 + 4}px` }}>
+                    <div className="hidden md:block relative border-b border-gray-200" style={{ height: `${barLaneCount * 22 + 4}px` }}>
                       {bars
                         .filter((bar) => bar.lane < 3)
                         .map((bar) => {
@@ -396,9 +396,9 @@ export default function CalendarView() {
                                 left: `${leftPercent}%`,
                                 width: `${widthPercent}%`,
                               }}
-                              title={`${bar.reservation.vehicles?.name || "차량"} - ${bar.reservation.guest_name} (${bar.reservation.start_date} ~ ${bar.reservation.end_date})`}
+                              title={`${bar.reservation.vehicles?.name || "차량"} - ${bar.reservation.department} ${bar.reservation.guest_name} (${bar.reservation.start_date} ~ ${bar.reservation.end_date})`}
                             >
-                              {bar.reservation.vehicles?.name} {bar.reservation.guest_name}
+                              {bar.reservation.vehicles?.name} {bar.reservation.department} {bar.reservation.guest_name}
                             </div>
                           );
                         })}
@@ -508,18 +508,18 @@ function MonthSummary({ reservations }: { reservations: Reservation[] }) {
     returned: reservations.filter((r) => r.status === "returned").length,
   };
 
-  const vehicleCount: Record<string, { name: string; count: number }> = {};
+  const deptCount: Record<string, { name: string; count: number }> = {};
   reservations
     .filter((r) => r.status !== "rejected")
     .forEach((r) => {
-      const name = r.vehicles?.name || "알 수 없음";
-      if (!vehicleCount[name]) vehicleCount[name] = { name, count: 0 };
-      vehicleCount[name].count++;
+      const dept = r.department || "미지정";
+      if (!deptCount[dept]) deptCount[dept] = { name: dept, count: 0 };
+      deptCount[dept].count++;
     });
 
-  const topVehicles = Object.values(vehicleCount)
+  const topDepts = Object.values(deptCount)
     .sort((a, b) => b.count - a.count)
-    .slice(0, 3);
+    .slice(0, 5);
 
   if (stats.total === 0) {
     return (
@@ -542,25 +542,25 @@ function MonthSummary({ reservations }: { reservations: Reservation[] }) {
         <MiniStat label="전체" count={stats.total} />
       </div>
 
-      {topVehicles.length > 0 && (
+      {topDepts.length > 0 && (
         <div className="card !p-3">
-          <p className="text-xs text-gray-500 mb-2">인기 차량</p>
+          <p className="text-xs text-gray-500 mb-2">대여 많은 부서</p>
           <div className="space-y-1.5">
-            {topVehicles.map((v, i) => (
-              <div key={v.name} className="flex items-center gap-2">
+            {topDepts.map((d, i) => (
+              <div key={d.name} className="flex items-center gap-2">
                 <span className="text-xs font-bold text-gray-400 w-4">{i + 1}</span>
                 <div className="flex-1 flex items-center gap-2">
-                  <span className="text-sm text-gray-900">{v.name}</span>
+                  <span className="text-sm text-gray-900">{d.name}</span>
                   <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-primary-400 rounded-full"
                       style={{
-                        width: `${Math.round((v.count / stats.total) * 100)}%`,
+                        width: `${Math.round((d.count / stats.total) * 100)}%`,
                       }}
                     />
                   </div>
                 </div>
-                <span className="text-xs text-gray-500">{v.count}건</span>
+                <span className="text-xs text-gray-500">{d.count}건</span>
               </div>
             ))}
           </div>

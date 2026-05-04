@@ -141,7 +141,7 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen pb-24">
       <Header />
-      <main className="max-w-2xl md:max-w-4xl mx-auto px-4 pt-4">
+      <main className="max-w-2xl md:max-w-full mx-auto px-4 md:px-8 pt-4">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-xl font-bold text-gray-900">관리자</h2>
