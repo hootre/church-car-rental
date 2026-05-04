@@ -644,11 +644,11 @@ function MonthSummary({ reservations }: { reservations: Reservation[] }) {
       <h4 className="font-bold text-gray-900 text-sm">이번 달 요약</h4>
 
       <div className="grid grid-cols-3 gap-1.5">
-        <MiniStat label="대기" count={stats.pending} />
-        <MiniStat label="1차승인" count={stats.staff_approved} />
+        <MiniStat label="담당장로" count={stats.pending} />
+        <MiniStat label="기획장로" count={stats.staff_approved} />
         <MiniStat label="승인완료" count={stats.approved} />
         <MiniStat label="대여중" count={stats.in_use} />
-        <MiniStat label="반납" count={stats.returned} />
+        <MiniStat label="반납완료" count={stats.returned} />
         <MiniStat label="전체" count={stats.total} />
       </div>
 

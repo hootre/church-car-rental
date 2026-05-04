@@ -341,8 +341,8 @@ export default function ReservationHistory() {
                   className="input-field !py-2 text-sm"
                 >
                   <option value="all">전체</option>
-                  <option value="pending">대기중</option>
-                  <option value="staff_approved">1차승인</option>
+                  <option value="pending">담당장로</option>
+                  <option value="staff_approved">기획장로</option>
                   <option value="approved">승인완료</option>
                   <option value="in_use">대여중</option>
                   <option value="returned">반납완료</option>

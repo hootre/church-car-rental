@@ -144,11 +144,11 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
     <div>
       {/* 통계 카드 */}
       <div className="grid grid-cols-3 gap-2 mb-4">
-        <StatCard label="대기" count={stats.pending} color="text-yellow-600" />
-        <StatCard label="1차승인" count={stats.staff_approved} color="text-emerald-600" />
+        <StatCard label="담당장로" count={stats.pending} color="text-yellow-600" />
+        <StatCard label="기획장로" count={stats.staff_approved} color="text-emerald-600" />
         <StatCard label="승인완료" count={stats.approved} color="text-green-600" />
         <StatCard label="대여중" count={stats.in_use} color="text-blue-600" />
-        <StatCard label="반납" count={stats.returned} color="text-purple-600" />
+        <StatCard label="반납완료" count={stats.returned} color="text-purple-600" />
         <StatCard label="전체" count={stats.total} color="text-gray-600" />
       </div>
 
@@ -156,11 +156,11 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
       <div className="flex gap-1 overflow-x-auto pb-2 mb-4 scrollbar-hide">
         {[
           { key: "all", label: "전체" },
-          { key: "pending", label: "대기" },
-          { key: "staff_approved", label: "1차승인" },
+          { key: "pending", label: "담당장로" },
+          { key: "staff_approved", label: "기획장로" },
           { key: "approved", label: "승인완료" },
           { key: "in_use", label: "대여중" },
-          { key: "returned", label: "반납" },
+          { key: "returned", label: "반납완료" },
         ].map((f) => (
           <button
             key={f.key}
