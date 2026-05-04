@@ -18,14 +18,14 @@ const dotColor: Record<string, string> = {
   rejected: "bg-red-300",
 };
 
-// 상태별 이벤트 바 색상 (데스크탑용)
+// 상태별 이벤트 바 색상 (데스크탑용 - 고채도)
 const barColor: Record<string, string> = {
-  pending: "bg-yellow-200 text-yellow-800 border border-yellow-300",
-  staff_approved: "bg-emerald-200 text-emerald-800 border border-emerald-300",
-  approved: "bg-green-200 text-green-800 border border-green-300",
-  in_use: "bg-blue-200 text-blue-800 border border-blue-300",
-  returned: "bg-purple-200 text-purple-800 border border-purple-300",
-  rejected: "bg-red-200 text-red-800 border border-red-300",
+  pending: "bg-yellow-300 text-yellow-900",
+  staff_approved: "bg-emerald-300 text-emerald-900",
+  approved: "bg-green-400 text-green-900",
+  in_use: "bg-blue-300 text-blue-900",
+  returned: "bg-purple-300 text-purple-900",
+  rejected: "bg-red-300 text-red-900",
 };
 
 interface EventBar {
@@ -43,6 +43,7 @@ export default function CalendarView() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [popupReservation, setPopupReservation] = useState<Reservation | null>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -368,56 +369,165 @@ export default function CalendarView() {
                     })}
                   </div>
 
-                  {/* 데스크탑: 이벤트 바 행 (주 내 통합) */}
-                  {barLaneCount > 0 && (
-                    <div className="hidden md:block relative border-b border-gray-200" style={{ height: `${barLaneCount * 22 + 4}px` }}>
-                      {bars
-                        .filter((bar) => bar.lane < 3)
-                        .map((bar) => {
-                          const span = bar.endCol - bar.startCol + 1;
-                          const leftPercent = (bar.startCol / 7) * 100;
-                          const widthPercent = (span / 7) * 100;
+                  {/* 데스크탑: 이벤트 바 영역 (항상 최소 높이 확보) */}
+                  <div
+                    className="hidden md:block relative border-b border-gray-200"
+                    style={{ height: `${Math.max(barLaneCount * 26 + 6, 52)}px` }}
+                  >
+                    {/* 세로 격자선 */}
+                    {[1, 2, 3, 4, 5, 6].map((col) => (
+                      <div
+                        key={`vline-${col}`}
+                        className="absolute top-0 bottom-0 border-l border-gray-200"
+                        style={{ left: `${(col / 7) * 100}%` }}
+                      />
+                    ))}
+                    {bars
+                      .filter((bar) => bar.lane < 3)
+                      .map((bar) => {
+                        const span = bar.endCol - bar.startCol + 1;
+                        const leftPercent = (bar.startCol / 7) * 100;
+                        const widthPercent = (span / 7) * 100;
 
-                          let roundedClass = "rounded";
-                          if (bar.isStart && bar.isEnd) roundedClass = "rounded";
-                          else if (bar.isStart && !bar.isEnd) roundedClass = "rounded-l";
-                          else if (!bar.isStart && bar.isEnd) roundedClass = "rounded-r";
-                          else roundedClass = "rounded-none";
+                        let roundedClass = "rounded";
+                        if (bar.isStart && bar.isEnd) roundedClass = "rounded";
+                        else if (bar.isStart && !bar.isEnd) roundedClass = "rounded-l";
+                        else if (!bar.isStart && bar.isEnd) roundedClass = "rounded-r";
+                        else roundedClass = "rounded-none";
 
-                          return (
-                            <div
-                              key={bar.id}
-                              className={`absolute h-[18px] flex items-center px-1.5 text-[10px] font-medium truncate
-                                ${barColor[bar.reservation.status] || "bg-gray-200 text-gray-700 border border-gray-300"}
-                                ${roundedClass}
-                              `}
-                              style={{
-                                top: `${bar.lane * 22 + 2}px`,
-                                left: `${leftPercent}%`,
-                                width: `${widthPercent}%`,
-                              }}
-                              title={`${bar.reservation.vehicles?.name || "차량"} - ${bar.reservation.department} ${bar.reservation.guest_name} (${bar.reservation.start_date} ~ ${bar.reservation.end_date})`}
-                            >
-                              {bar.reservation.vehicles?.name} {bar.reservation.department} {bar.reservation.guest_name}
-                            </div>
-                          );
-                        })}
-                      {bars.length > 3 && maxLane >= 3 && (
-                        <div
-                          className="absolute right-1 text-[9px] text-gray-400"
-                          style={{ top: `${3 * 22 - 4}px` }}
-                        >
-                          +{bars.filter((b) => b.lane >= 3).length}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                        return (
+                          <button
+                            key={bar.id}
+                            onClick={() => setPopupReservation(bar.reservation)}
+                            className={`absolute h-[22px] flex items-center px-2 text-[11px] font-medium truncate
+                              cursor-pointer hover:opacity-80 active:opacity-60 transition-opacity
+                              ${barColor[bar.reservation.status] || "bg-gray-300 text-gray-700"}
+                              ${roundedClass}
+                            `}
+                            style={{
+                              top: `${bar.lane * 26 + 4}px`,
+                              left: `${leftPercent}%`,
+                              width: `${widthPercent}%`,
+                            }}
+                            title={`${bar.reservation.vehicles?.name || "차량"} - ${bar.reservation.department} ${bar.reservation.guest_name} (${bar.reservation.start_date} ~ ${bar.reservation.end_date})`}
+                          >
+                            {bar.reservation.vehicles?.name} {bar.reservation.department} {bar.reservation.guest_name}
+                          </button>
+                        );
+                      })}
+                    {bars.length > 3 && maxLane >= 3 && (
+                      <div
+                        className="absolute right-1 text-[9px] text-gray-400"
+                        style={{ top: `${3 * 26}px` }}
+                      >
+                        +{bars.filter((b) => b.lane >= 3).length}
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* 일정 상세 팝업 */}
+      {popupReservation && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setPopupReservation(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[80vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
+            {/* 팝업 헤더 */}
+            <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between rounded-t-2xl">
+              <h3 className="font-bold text-gray-900">예약 상세</h3>
+              <button
+                onClick={() => setPopupReservation(null)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* 차량 + 상태 */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${dotColor[popupReservation.status]}`} />
+                  <span className="font-bold text-lg text-gray-900">{popupReservation.vehicles?.name || "차량"}</span>
+                </div>
+                <StatusBadge status={popupReservation.status} />
+              </div>
+
+              {/* 기본 정보 */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-2.5">
+                <PopupRow label="신청자" value={`${popupReservation.guest_name} (${popupReservation.department})`} />
+                <PopupRow label="연락처" value={popupReservation.phone} />
+                <PopupRow
+                  label="사용기간"
+                  value={
+                    popupReservation.start_date === popupReservation.end_date
+                      ? `${popupReservation.start_date} ${popupReservation.start_time?.slice(0, 5)} ~ ${popupReservation.end_time?.slice(0, 5)}`
+                      : `${popupReservation.start_date} ${popupReservation.start_time?.slice(0, 5)} ~ ${popupReservation.end_date} ${popupReservation.end_time?.slice(0, 5)}`
+                  }
+                />
+                {popupReservation.purpose && <PopupRow label="사용목적" value={popupReservation.purpose} />}
+                {popupReservation.destination && <PopupRow label="행선지" value={popupReservation.destination} />}
+                {popupReservation.passenger_count && <PopupRow label="탑승인원" value={`${popupReservation.passenger_count}명`} />}
+                {popupReservation.driver_name && <PopupRow label="운전자" value={popupReservation.driver_name} />}
+              </div>
+
+              {/* 승인 현황 */}
+              <div className="bg-gray-50 rounded-xl p-4">
+                <p className="text-xs font-medium text-gray-700 mb-2">승인 현황</p>
+                <div className="flex gap-3">
+                  <div className="flex-1 text-center">
+                    <div className={`text-xs font-bold ${popupReservation.staff_approved_at ? "text-emerald-600" : "text-gray-300"}`}>
+                      {popupReservation.staff_approved_at ? "✓ 승인" : "⏳ 대기"}
+                    </div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">차량담당 장로</div>
+                    {popupReservation.staff_approved_at && (
+                      <div className="text-[10px] text-gray-400">
+                        {new Date(popupReservation.staff_approved_at).toLocaleDateString("ko-KR")}
+                      </div>
+                    )}
+                  </div>
+                  <div className="w-px bg-gray-200" />
+                  <div className="flex-1 text-center">
+                    <div className={`text-xs font-bold ${popupReservation.manager_approved_at ? "text-green-600" : "text-gray-300"}`}>
+                      {popupReservation.manager_approved_at ? "✓ 승인" : "⏳ 대기"}
+                    </div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">기획장로</div>
+                    {popupReservation.manager_approved_at && (
+                      <div className="text-[10px] text-gray-400">
+                        {new Date(popupReservation.manager_approved_at).toLocaleDateString("ko-KR")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 처리 시각 */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-2.5">
+                <PopupRow label="신청일" value={new Date(popupReservation.created_at).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })} />
+                {popupReservation.picked_up_at && (
+                  <PopupRow label="대여 시작" value={new Date(popupReservation.picked_up_at).toLocaleDateString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })} />
+                )}
+                {popupReservation.returned_at && (
+                  <PopupRow label="반납 완료" value={new Date(popupReservation.returned_at).toLocaleDateString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })} />
+                )}
+              </div>
+
+              {/* 관리자 메모 */}
+              {popupReservation.admin_note && (
+                <div className="bg-yellow-50 rounded-xl p-4">
+                  <p className="text-xs font-medium text-yellow-700 mb-1">관리자 메모</p>
+                  <p className="text-sm text-yellow-800">{popupReservation.admin_note}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 이번 달 요약 */}
       {!selectedDate && (
@@ -575,6 +685,15 @@ function MiniStat({ label, count }: { label: string; count: number }) {
     <div className="bg-gray-50 rounded-lg p-2 text-center">
       <div className="text-lg font-bold text-gray-900">{count}</div>
       <div className="text-[10px] text-gray-500">{label}</div>
+    </div>
+  );
+}
+
+function PopupRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between items-start gap-4">
+      <span className="text-xs text-gray-400 shrink-0">{label}</span>
+      <span className="text-xs text-gray-900 text-right">{value}</span>
     </div>
   );
 }
