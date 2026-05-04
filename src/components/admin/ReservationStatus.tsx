@@ -157,38 +157,14 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
 
   return (
     <div>
-      {/* 통계 카드 */}
+      {/* 통계 카드 (필터 겸용) */}
       <div className="grid grid-cols-3 gap-2 mb-4">
-        <StatCard label="담당장로" count={stats.pending} color="text-yellow-600" />
-        <StatCard label="기획장로" count={stats.staff_approved} color="text-emerald-600" />
-        <StatCard label="승인완료" count={stats.approved} color="text-green-600" />
-        <StatCard label="대여중" count={stats.in_use} color="text-blue-600" />
-        <StatCard label="반납완료" count={stats.returned} color="text-purple-600" />
-        <StatCard label="전체" count={stats.total} color="text-gray-600" />
-      </div>
-
-      {/* 필터 탭 */}
-      <div className="flex gap-1 overflow-x-auto pb-2 mb-4 scrollbar-hide">
-        {[
-          { key: "all", label: "전체" },
-          { key: "pending", label: "담당장로" },
-          { key: "staff_approved", label: "기획장로" },
-          { key: "approved", label: "승인완료" },
-          { key: "in_use", label: "대여중" },
-          { key: "returned", label: "반납완료" },
-        ].map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-              filter === f.key
-                ? "bg-primary-600 text-white"
-                : "bg-gray-100 text-gray-600"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+        <StatCard label="담당장로" count={stats.pending} bg="bg-yellow-50" color="text-yellow-700" subColor="text-yellow-600" active={filter === "pending"} onClick={() => setFilter(filter === "pending" ? "all" : "pending")} />
+        <StatCard label="기획장로" count={stats.staff_approved} bg="bg-emerald-50" color="text-emerald-700" subColor="text-emerald-600" active={filter === "staff_approved"} onClick={() => setFilter(filter === "staff_approved" ? "all" : "staff_approved")} />
+        <StatCard label="승인완료" count={stats.approved} bg="bg-green-50" color="text-green-700" subColor="text-green-600" active={filter === "approved"} onClick={() => setFilter(filter === "approved" ? "all" : "approved")} />
+        <StatCard label="대여중" count={stats.in_use} bg="bg-blue-50" color="text-blue-700" subColor="text-blue-600" active={filter === "in_use"} onClick={() => setFilter(filter === "in_use" ? "all" : "in_use")} />
+        <StatCard label="반납완료" count={stats.returned} bg="bg-purple-50" color="text-purple-700" subColor="text-purple-600" active={filter === "returned"} onClick={() => setFilter(filter === "returned" ? "all" : "returned")} />
+        <StatCard label="전체" count={stats.total} bg="bg-gray-50" color="text-gray-700" subColor="text-gray-500" active={filter === "all"} onClick={() => setFilter("all")} />
       </div>
 
       {/* 예약 목록 */}
@@ -361,12 +337,19 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
   );
 }
 
-function StatCard({ label, count, color }: { label: string; count: number; color: string }) {
+function StatCard({ label, count, bg, color, subColor, active, onClick }: {
+  label: string; count: number; bg: string; color: string; subColor: string; active: boolean; onClick: () => void;
+}) {
   return (
-    <div className="bg-gray-50 rounded-xl p-3 text-center">
+    <button
+      onClick={onClick}
+      className={`${bg} rounded-xl p-3 text-center transition-all cursor-pointer ${
+        active ? "ring-2 ring-offset-1 ring-primary-500 scale-[1.02]" : "hover:scale-[1.02]"
+      }`}
+    >
       <div className={`text-xl font-bold ${color}`}>{count}</div>
-      <div className="text-[10px] text-gray-500">{label}</div>
-    </div>
+      <div className={`text-[10px] ${active ? subColor + " font-semibold" : "text-gray-500"}`}>{label}</div>
+    </button>
   );
 }
 
