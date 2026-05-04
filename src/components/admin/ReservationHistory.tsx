@@ -14,7 +14,6 @@ export default function ReservationHistory() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // 상세 팝업
   const [modalReservation, setModalReservation] = useState<Reservation | null>(null);
@@ -414,7 +413,7 @@ export default function ReservationHistory() {
         총 <span className="font-bold text-gray-900">{reservations.length}</span>건
       </p>
 
-      {/* 예약 목록 — 아코디언 */}
+      {/* 예약 목록 */}
       {loading ? (
         <div className="text-center py-12 text-gray-400">불러오는 중...</div>
       ) : reservations.length === 0 ? (
@@ -424,120 +423,42 @@ export default function ReservationHistory() {
         </div>
       ) : (
         <div className="space-y-2">
-          {reservations.map((r) => {
-            const isExpanded = expandedId === r.id;
-
-            return (
-              <div key={r.id} className="card !p-0 overflow-hidden">
-                {/* 아코디언 헤더 (항상 보임) */}
-                <button
-                  onClick={() => setExpandedId(isExpanded ? null : r.id)}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm">
-                        {r.vehicles?.type === "bus" ? "🚌" : r.vehicles?.type === "van" ? "🚐" : "🚗"}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-sm text-gray-900 truncate">{r.vehicles?.name}</span>
-                          <StatusBadge status={r.status} />
-                        </div>
-                        <p className="text-xs text-gray-400 truncate">
-                          {r.guest_name} ({r.department}) · {r.start_date}
-                        </p>
+          {reservations.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => setModalReservation(r)}
+              className="card !p-0 overflow-hidden w-full text-left hover:bg-gray-50 transition-colors"
+            >
+              <div className="px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm">
+                      {r.vehicles?.type === "bus" ? "🚌" : r.vehicles?.type === "van" ? "🚐" : "🚗"}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-sm text-gray-900 truncate">{r.vehicles?.name}</span>
+                        <StatusBadge status={r.status} />
                       </div>
-                    </div>
-                    <svg
-                      className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </button>
-
-                {/* 아코디언 펼침 영역 */}
-                {isExpanded && (
-                  <div className="px-4 pb-3 border-t border-gray-100">
-                    <div className="pt-3 space-y-1.5 text-sm">
-                      <InfoRow label="신청자" value={`${r.guest_name} (${r.department})`} />
-                      <InfoRow label="연락처" value={r.phone} />
-                      <InfoRow label="대여" value={`${r.start_date} ${r.start_time?.slice(0, 5)}`} />
-                      <InfoRow label="반납" value={`${r.end_date} ${r.end_time?.slice(0, 5)}`} />
-                      {r.destination && <InfoRow label="행선지" value={r.destination} />}
-                      {r.purpose && <InfoRow label="사용목적" value={r.purpose} />}
-                    </div>
-
-                    {/* 승인 현황 미니 */}
-                    <div className="flex gap-3 mt-3 bg-gray-50 rounded-lg p-2.5">
-                      <div className="flex-1 text-center">
-                        <div className={`text-xs font-bold ${r.staff_approved_at ? "text-emerald-600" : "text-gray-300"}`}>
-                          {r.staff_approved_at ? "✓ 승인" : "⏳ 대기"}
-                        </div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">차량담당 장로</div>
-                        {r.staff_approved_at && getAdminName(r.staff_approved_by) !== "-" && (
-                          <div className="text-[10px] text-emerald-600 font-medium">
-                            {getAdminName(r.staff_approved_by)}
-                          </div>
-                        )}
-                      </div>
-                      <div className="w-px bg-gray-200" />
-                      <div className="flex-1 text-center">
-                        <div className={`text-xs font-bold ${r.manager_approved_at ? "text-green-600" : "text-gray-300"}`}>
-                          {r.manager_approved_at ? "✓ 승인" : "⏳ 대기"}
-                        </div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">기획장로</div>
-                        {r.manager_approved_at && getAdminName(r.manager_approved_by) !== "-" && (
-                          <div className="text-[10px] text-green-600 font-medium">
-                            {getAdminName(r.manager_approved_by)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 버튼 영역 */}
-                    <div className="flex gap-2 mt-3">
-                      <button
-                        onClick={() => setModalReservation(r)}
-                        className="flex-1 py-2 bg-primary-50 text-primary-600 text-xs font-semibold rounded-lg hover:bg-primary-100 transition-colors"
-                      >
-                        상세보기
-                      </button>
-                      <button
-                        onClick={() => handlePrint(r)}
-                        className="flex-1 py-2 bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-1"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                        </svg>
-                        문서 출력
-                      </button>
-                      <button
-                        onClick={() => handleDelete(r.id)}
-                        className="py-2 px-3 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="삭제"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+                      <p className="text-xs text-gray-400 truncate">
+                        {r.guest_name} ({r.department}) · {r.start_date}
+                      </p>
                     </div>
                   </div>
-                )}
+                  <svg className="w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
               </div>
-            );
-          })}
+            </button>
+          ))}
         </div>
       )}
 
       {/* ===== 상세보기 팝업 (모달) ===== */}
       {modalReservation && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
           onClick={() => setModalReservation(null)}
         >
           {/* 배경 오버레이 */}
@@ -545,11 +466,11 @@ export default function ReservationHistory() {
 
           {/* 모달 본체 */}
           <div
-            className="relative bg-white rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl"
+            className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[90vh] sm:max-h-[85vh] overflow-y-auto shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 모달 헤더 */}
-            <div className="sticky top-0 bg-white rounded-t-2xl border-b border-gray-100 px-5 py-4 flex items-center justify-between z-10">
+            <div className="sticky top-0 bg-white rounded-t-2xl border-b border-gray-100 px-4 py-3 sm:px-5 sm:py-4 flex items-center justify-between z-10">
               <div>
                 <h3 className="font-bold text-lg text-gray-900">예약 상세</h3>
                 <p className="text-xs text-gray-400 mt-0.5">
@@ -567,7 +488,7 @@ export default function ReservationHistory() {
             </div>
 
             {/* 모달 컨텐츠 */}
-            <div className="px-5 py-4 space-y-5">
+            <div className="px-4 py-3 sm:px-5 sm:py-4 space-y-4">
               {/* 상태 */}
               <div className="flex items-center gap-2">
                 <StatusBadge status={modalReservation.status} />
@@ -751,7 +672,7 @@ export default function ReservationHistory() {
             </div>
 
             {/* 모달 푸터 */}
-            <div className="sticky bottom-0 bg-white rounded-b-2xl border-t border-gray-100 px-5 py-3 flex gap-2">
+            <div className="sticky bottom-0 bg-white rounded-b-2xl border-t border-gray-100 px-4 py-3 sm:px-5 flex gap-2 safe-area-bottom">
               <button
                 onClick={() => handlePrint(modalReservation)}
                 className="flex-1 py-2.5 bg-primary-600 text-white text-sm font-semibold rounded-xl hover:bg-primary-700 transition-colors flex items-center justify-center gap-1.5"
@@ -778,18 +699,18 @@ export default function ReservationHistory() {
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between text-sm">
+    <div className="flex justify-between gap-3 text-sm">
       <span className="text-gray-500 shrink-0">{label}</span>
-      <span className="text-gray-900 text-right">{value}</span>
+      <span className="text-gray-900 text-right break-keep">{value}</span>
     </div>
   );
 }
 
 function ModalRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between text-sm">
-      <span className="text-gray-500 shrink-0 mr-3">{label}</span>
-      <span className="text-gray-900 font-medium text-right">{value}</span>
+    <div className="flex justify-between gap-3 text-sm">
+      <span className="text-gray-500 shrink-0">{label}</span>
+      <span className="text-gray-900 font-medium text-right break-keep">{value}</span>
     </div>
   );
 }

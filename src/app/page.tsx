@@ -8,13 +8,13 @@ export default function HomePage() {
     <div className="min-h-screen pb-20">
       <Header />
 
-      <main className="max-w-lg mx-auto px-4 pt-8">
+      <main className="max-w-lg mx-auto px-4 pt-6">
         {/* 히어로 */}
-        <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-primary-100 rounded-3xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-4xl">🚗</span>
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <span className="text-3xl">🚗</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          <h1 className="text-xl font-bold text-gray-900 mb-1">
             한국중앙교회 차량부
           </h1>
           <p className="text-gray-500 text-sm">
@@ -74,9 +74,9 @@ export default function HomePage() {
         </div>
 
         {/* 이용 안내 */}
-        <div className="mt-8 p-4 bg-blue-50 rounded-2xl">
+        <div className="mt-6 p-4 bg-blue-50 rounded-2xl">
           <h3 className="font-semibold text-primary-800 text-sm mb-2">이용안내</h3>
-          <ul className="text-xs text-primary-700 space-y-1.5">
+          <ul className="text-xs text-primary-700 space-y-1.5 leading-relaxed">
             <li>• 차량은 2주일 전 신청을 원칙으로 합니다</li>
             <li>• 예약 신청 후 관리자 승인이 필요합니다</li>
             <li>• 차량 사용 후 원래 주차 위치에 반납해 주세요</li>

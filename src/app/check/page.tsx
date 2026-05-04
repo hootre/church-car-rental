@@ -13,7 +13,7 @@ export default function CheckPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
 
   const fetchReservations = useCallback(async () => {
     if (!phone.trim() || !name.trim()) return;
@@ -33,7 +33,6 @@ export default function CheckPage() {
       toast.error("조회에 실패했습니다");
       console.error(error);
     } else {
-      // 취소된 예약은 대여자 조회에서 숨김
       const visible = (data || []).filter((r) => r.status !== "cancelled");
       setReservations(visible);
     }
@@ -70,6 +69,7 @@ export default function CheckPage() {
       toast.error("상태 변경에 실패했습니다");
     } else {
       toast.success("대여가 시작되었습니다. 안전운행 하세요!");
+      setSelectedReservation(null);
       fetchReservations();
     }
   }
@@ -96,6 +96,7 @@ export default function CheckPage() {
       toast.error("상태 변경에 실패했습니다");
     } else {
       toast.success("반납이 완료되었습니다. 감사합니다!");
+      setSelectedReservation(null);
       fetchReservations();
     }
   }
@@ -116,6 +117,7 @@ export default function CheckPage() {
       toast.error("예약 취소에 실패했습니다");
     } else {
       toast.success("예약이 취소되었습니다");
+      setSelectedReservation(null);
       fetchReservations();
     }
   }
@@ -146,9 +148,9 @@ export default function CheckPage() {
     <div className="min-h-screen pb-24">
       <Header />
 
-      <main className="max-w-lg mx-auto px-4 pt-6">
+      <main className="max-w-lg mx-auto px-4 pt-5">
         <h2 className="text-xl font-bold text-gray-900 mb-1">예약 조회</h2>
-        <p className="text-sm text-gray-500 mb-6">
+        <p className="text-sm text-gray-500 mb-4">
           예약 시 입력한 이름과 전화번호로 조회합니다
         </p>
 
@@ -190,216 +192,245 @@ export default function CheckPage() {
               총 <span className="font-bold text-gray-900">{reservations.length}</span>건
             </p>
 
-            {reservations.map((r) => {
-              const isExpanded = expandedId === r.id;
-              const pickupPhotos = (r.reservation_photos || []).filter(
-                (p) => p.photo_type === "pickup"
-              );
-              const returnPhotos = (r.reservation_photos || []).filter(
-                (p) => p.photo_type === "return"
-              );
-
-              return (
-                <div key={r.id} className="card">
-                  {/* 헤더 */}
-                  <button
-                    onClick={() => setExpandedId(isExpanded ? null : r.id)}
-                    className="w-full text-left"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-bold text-gray-900">
-                        {r.vehicles?.name || "차량"}
-                      </h3>
-                      <div className="flex items-center gap-2">
-                        <StatusBadge status={r.status} />
-                        <svg
-                          className={`w-4 h-4 text-gray-400 transition-transform ${
-                            isExpanded ? "rotate-180" : ""
-                          }`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </div>
-
-                    {/* 상태 안내 */}
-                    <p className="text-xs text-primary-600 bg-primary-50 px-3 py-1.5 rounded-lg mb-2">
-                      {getStatusGuide(r.status)}
-                    </p>
-
-                    {/* 기본 정보 */}
-                    <div className="space-y-1 text-sm">
-                      <InfoRow label="대여" value={`${r.start_date} ${r.start_time?.slice(0, 5)}`} />
-                      <InfoRow label="반납" value={`${r.end_date} ${r.end_time?.slice(0, 5)}`} />
-                      <InfoRow label="소속" value={r.department} />
-                      {r.destination && <InfoRow label="행선지" value={r.destination} />}
-                      {r.passenger_count && <InfoRow label="탑승인원" value={`${r.passenger_count}명`} />}
-                      {r.driver_name && <InfoRow label="운전자" value={r.driver_name} />}
-                      {r.purpose && <InfoRow label="사유" value={r.purpose} />}
-                    </div>
-                  </button>
-
-                  {/* 확장 영역 */}
-                  {isExpanded && (
-                    <div className="mt-3 pt-3 border-t border-gray-100 space-y-4">
-                      {/* 승인 현황 */}
-                      <div className="bg-gray-50 rounded-xl p-3">
-                        <p className="text-xs font-medium text-gray-700 mb-2">승인 현황</p>
-                        <div className="flex gap-3">
-                          <div className="flex-1 text-center">
-                            <div className={`text-xs font-bold ${r.staff_approved_at ? "text-emerald-600" : "text-gray-300"}`}>
-                              {r.staff_approved_at ? "✓ 승인" : "⏳ 대기"}
-                            </div>
-                            <div className="text-[10px] text-gray-400 mt-0.5">차량담당 장로</div>
-                            {r.staff_approved_at && (
-                              <div className="text-[10px] text-gray-400">
-                                {new Date(r.staff_approved_at).toLocaleDateString("ko-KR")}
-                              </div>
-                            )}
-                          </div>
-                          <div className="w-px bg-gray-200" />
-                          <div className="flex-1 text-center">
-                            <div className={`text-xs font-bold ${r.manager_approved_at ? "text-green-600" : "text-gray-300"}`}>
-                              {r.manager_approved_at ? "✓ 승인" : "⏳ 대기"}
-                            </div>
-                            <div className="text-[10px] text-gray-400 mt-0.5">기획장로</div>
-                            {r.manager_approved_at && (
-                              <div className="text-[10px] text-gray-400">
-                                {new Date(r.manager_approved_at).toLocaleDateString("ko-KR")}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 추가 정보 */}
-                      <div className="space-y-1 text-sm">
-                        {r.admin_note && (
-                          <div className="p-2 bg-yellow-50 rounded-lg">
-                            <span className="text-xs text-yellow-700">📝 {r.admin_note}</span>
-                          </div>
-                        )}
-                        {r.picked_up_at && (
-                          <InfoRow
-                            label="대여 시각"
-                            value={new Date(r.picked_up_at).toLocaleString("ko-KR")}
-                          />
-                        )}
-                        {r.returned_at && (
-                          <InfoRow
-                            label="반납 시각"
-                            value={new Date(r.returned_at).toLocaleString("ko-KR")}
-                          />
-                        )}
-                        <InfoRow
-                          label="신청일"
-                          value={new Date(r.created_at).toLocaleDateString("ko-KR")}
-                        />
-                      </div>
-
-                      {/* ===== 대기/1차승인: 예약 취소 ===== */}
-                      {(r.status === "pending" || r.status === "staff_approved") && (
-                        <button
-                          onClick={() => handleCancel(r)}
-                          className="w-full py-3 bg-orange-500 text-white font-semibold rounded-xl
-                                     hover:bg-orange-600 active:bg-orange-700 transition-colors"
-                        >
-                          예약취소
-                        </button>
-                      )}
-
-                      {/* ===== 승인됨: 대여 사진 업로드 + 대여 시작 ===== */}
-                      {r.status === "approved" && (
-                        <div className="space-y-3">
-                          <PhotoUpload
-                            reservationId={r.id}
-                            photoType="pickup"
-                            existingPhotos={pickupPhotos}
-                            onUploadComplete={fetchReservations}
-                          />
-                          <button
-                            onClick={() => handlePickup(r)}
-                            className="w-full py-3 bg-blue-500 text-white font-semibold rounded-xl
-                                       hover:bg-blue-600 active:bg-blue-700 transition-colors"
-                          >
-                            🚗 대여 시작
-                          </button>
-                        </div>
-                      )}
-
-                      {/* ===== 대여중: 반납 사진 업로드 + 반납 완료 ===== */}
-                      {r.status === "in_use" && (
-                        <div className="space-y-3">
-                          {/* 대여 시 사진 보기 */}
-                          {pickupPhotos.length > 0 && (
-                            <div className="opacity-70">
-                              <PhotoUpload
-                                reservationId={r.id}
-                                photoType="pickup"
-                                existingPhotos={pickupPhotos}
-                                readOnly
-                              />
-                            </div>
-                          )}
-
-                          {/* 반납 사진 업로드 */}
-                          <PhotoUpload
-                            reservationId={r.id}
-                            photoType="return"
-                            existingPhotos={returnPhotos}
-                            onUploadComplete={fetchReservations}
-                          />
-                          <button
-                            onClick={() => handleReturn(r)}
-                            className="w-full py-3 bg-purple-500 text-white font-semibold rounded-xl
-                                       hover:bg-purple-600 active:bg-purple-700 transition-colors"
-                          >
-                            🔑 반납 완료
-                          </button>
-                        </div>
-                      )}
-
-                      {/* ===== 반납완료: 사진 보기 전용 ===== */}
-                      {r.status === "returned" && (
-                        <div className="space-y-3">
-                          {pickupPhotos.length > 0 && (
-                            <PhotoUpload
-                              reservationId={r.id}
-                              photoType="pickup"
-                              existingPhotos={pickupPhotos}
-                              readOnly
-                            />
-                          )}
-                          {returnPhotos.length > 0 && (
-                            <PhotoUpload
-                              reservationId={r.id}
-                              photoType="return"
-                              existingPhotos={returnPhotos}
-                              readOnly
-                            />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
+            {reservations.map((r) => (
+              <button
+                key={r.id}
+                onClick={() => setSelectedReservation(r)}
+                className="card w-full text-left hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-bold text-gray-900">
+                    {r.vehicles?.name || "차량"}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={r.status} />
+                    <svg className="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
                 </div>
-              );
-            })}
+
+                {/* 상태 안내 */}
+                <p className="text-xs text-primary-600 bg-primary-50 px-3 py-2 rounded-lg mb-3 leading-relaxed text-center">
+                  {getStatusGuide(r.status)}
+                </p>
+
+                {/* 기본 정보 */}
+                <div className="space-y-1.5 text-sm">
+                  <InfoRow label="대여" value={`${r.start_date} ${r.start_time?.slice(0, 5)}`} />
+                  <InfoRow label="반납" value={`${r.end_date} ${r.end_time?.slice(0, 5)}`} />
+                  <InfoRow label="소속" value={r.department} />
+                </div>
+              </button>
+            ))}
           </div>
         )}
       </main>
+
+      {/* ===== 상세보기 팝업 ===== */}
+      {selectedReservation && (() => {
+        const r = selectedReservation;
+        const pickupPhotos = (r.reservation_photos || []).filter(
+          (p) => p.photo_type === "pickup"
+        );
+        const returnPhotos = (r.reservation_photos || []).filter(
+          (p) => p.photo_type === "return"
+        );
+
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+            onClick={() => setSelectedReservation(null)}
+          >
+            <div className="absolute inset-0 bg-black/50" />
+            <div
+              className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[90vh] sm:max-h-[85vh] overflow-y-auto shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* 팝업 헤더 */}
+              <div className="sticky top-0 bg-white rounded-t-2xl border-b border-gray-100 px-4 py-3 flex items-center justify-between z-10">
+                <div>
+                  <h3 className="font-bold text-lg text-gray-900">
+                    {r.vehicles?.name || "차량"}
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-0.5">예약 상세</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={r.status} />
+                  <button
+                    onClick={() => setSelectedReservation(null)}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* 팝업 컨텐츠 */}
+              <div className="px-4 py-4 space-y-4">
+                {/* 상태 안내 */}
+                <p className="text-xs text-primary-600 bg-primary-50 px-3 py-2 rounded-lg leading-relaxed text-center">
+                  {getStatusGuide(r.status)}
+                </p>
+
+                {/* 예약 정보 */}
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-400 mb-2">예약 정보</h4>
+                  <div className="bg-gray-50 rounded-xl p-3 space-y-2 text-sm">
+                    <InfoRow label="대여" value={`${r.start_date} ${r.start_time?.slice(0, 5)}`} />
+                    <InfoRow label="반납" value={`${r.end_date} ${r.end_time?.slice(0, 5)}`} />
+                    <InfoRow label="소속" value={r.department} />
+                    {r.destination && <InfoRow label="행선지" value={r.destination} />}
+                    {r.passenger_count && <InfoRow label="탑승인원" value={`${r.passenger_count}명`} />}
+                    {r.driver_name && <InfoRow label="운전자" value={r.driver_name} />}
+                    {r.purpose && <InfoRow label="사유" value={r.purpose} />}
+                  </div>
+                </div>
+
+                {/* 승인 현황 */}
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-400 mb-2">승인 현황</h4>
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <div className="flex gap-3">
+                      <div className="flex-1 text-center">
+                        <div className={`text-xs font-bold ${r.staff_approved_at ? "text-emerald-600" : "text-gray-300"}`}>
+                          {r.staff_approved_at ? "✓ 승인" : "⏳ 대기"}
+                        </div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">차량담당 장로</div>
+                        {r.staff_approved_at && (
+                          <div className="text-[10px] text-gray-400">
+                            {new Date(r.staff_approved_at).toLocaleDateString("ko-KR")}
+                          </div>
+                        )}
+                      </div>
+                      <div className="w-px bg-gray-200" />
+                      <div className="flex-1 text-center">
+                        <div className={`text-xs font-bold ${r.manager_approved_at ? "text-green-600" : "text-gray-300"}`}>
+                          {r.manager_approved_at ? "✓ 승인" : "⏳ 대기"}
+                        </div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">기획장로</div>
+                        {r.manager_approved_at && (
+                          <div className="text-[10px] text-gray-400">
+                            {new Date(r.manager_approved_at).toLocaleDateString("ko-KR")}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 추가 정보 */}
+                <div className="space-y-1.5 text-sm">
+                  {r.admin_note && (
+                    <div className="p-2.5 bg-yellow-50 rounded-xl">
+                      <span className="text-xs text-yellow-700">📝 {r.admin_note}</span>
+                    </div>
+                  )}
+                  {r.picked_up_at && (
+                    <InfoRow label="대여 시각" value={new Date(r.picked_up_at).toLocaleString("ko-KR")} />
+                  )}
+                  {r.returned_at && (
+                    <InfoRow label="반납 시각" value={new Date(r.returned_at).toLocaleString("ko-KR")} />
+                  )}
+                  <InfoRow label="신청일" value={new Date(r.created_at).toLocaleDateString("ko-KR")} />
+                </div>
+
+                {/* ===== 대기/1차승인: 예약 취소 ===== */}
+                {(r.status === "pending" || r.status === "staff_approved") && (
+                  <button
+                    onClick={() => handleCancel(r)}
+                    className="w-full py-3 bg-orange-500 text-white font-semibold rounded-xl
+                               hover:bg-orange-600 active:bg-orange-700 transition-colors"
+                  >
+                    예약취소
+                  </button>
+                )}
+
+                {/* ===== 승인됨: 대여 사진 업로드 + 대여 시작 ===== */}
+                {r.status === "approved" && (
+                  <div className="space-y-3">
+                    <PhotoUpload
+                      reservationId={r.id}
+                      photoType="pickup"
+                      existingPhotos={pickupPhotos}
+                      onUploadComplete={fetchReservations}
+                    />
+                    <button
+                      onClick={() => handlePickup(r)}
+                      className="w-full py-3 bg-blue-500 text-white font-semibold rounded-xl
+                                 hover:bg-blue-600 active:bg-blue-700 transition-colors"
+                    >
+                      🚗 대여 시작
+                    </button>
+                  </div>
+                )}
+
+                {/* ===== 대여중: 반납 사진 업로드 + 반납 완료 ===== */}
+                {r.status === "in_use" && (
+                  <div className="space-y-3">
+                    {pickupPhotos.length > 0 && (
+                      <div className="opacity-70">
+                        <PhotoUpload
+                          reservationId={r.id}
+                          photoType="pickup"
+                          existingPhotos={pickupPhotos}
+                          readOnly
+                        />
+                      </div>
+                    )}
+                    <PhotoUpload
+                      reservationId={r.id}
+                      photoType="return"
+                      existingPhotos={returnPhotos}
+                      onUploadComplete={fetchReservations}
+                    />
+                    <button
+                      onClick={() => handleReturn(r)}
+                      className="w-full py-3 bg-purple-500 text-white font-semibold rounded-xl
+                                 hover:bg-purple-600 active:bg-purple-700 transition-colors"
+                    >
+                      🔑 반납 완료
+                    </button>
+                  </div>
+                )}
+
+                {/* ===== 반납완료: 사진 보기 전용 ===== */}
+                {r.status === "returned" && (
+                  <div className="space-y-3">
+                    {pickupPhotos.length > 0 && (
+                      <PhotoUpload
+                        reservationId={r.id}
+                        photoType="pickup"
+                        existingPhotos={pickupPhotos}
+                        readOnly
+                      />
+                    )}
+                    {returnPhotos.length > 0 && (
+                      <PhotoUpload
+                        reservationId={r.id}
+                        photoType="return"
+                        existingPhotos={returnPhotos}
+                        readOnly
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between">
+    <div className="flex justify-between gap-3">
       <span className="text-sm text-gray-500 shrink-0">{label}</span>
-      <span className="text-sm font-medium text-gray-900 text-right">{value}</span>
+      <span className="text-sm font-medium text-gray-900 text-right break-keep">{value}</span>
     </div>
   );
 }

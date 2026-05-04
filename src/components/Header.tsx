@@ -9,7 +9,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200">
-      <div className="max-w-lg mx-auto px-4 py-3">
+      <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-center">
         <Link href="/" className="flex items-center gap-2">
           <Image
             src="/logo_dark.png"

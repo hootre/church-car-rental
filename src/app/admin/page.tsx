@@ -141,27 +141,27 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen pb-24">
       <Header />
-      <main className="max-w-2xl md:max-w-full mx-auto px-4 md:px-8 pt-4">
-        <div className="flex items-center justify-between mb-4">
+      <main className="max-w-2xl md:max-w-full mx-auto px-3 md:px-8 pt-3">
+        <div className="flex items-center justify-between mb-3">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">관리자</h2>
+            <h2 className="text-lg font-bold text-gray-900">관리자</h2>
             <p className="text-xs text-gray-500">
               {adminSession?.name} ({roleLabel[adminSession?.role || ""] || adminSession?.role})
             </p>
           </div>
           <button onClick={handleLogout}
-            className="text-sm text-gray-400 hover:text-red-500 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-50">
+            className="text-xs text-gray-400 hover:text-red-500 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-red-50">
             로그아웃
           </button>
         </div>
 
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-5 overflow-x-auto">
+        <div className="flex gap-0.5 bg-gray-100 rounded-xl p-1 mb-4 overflow-x-auto scrollbar-hide">
           {visibleTabs.map((tab) => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 py-2.5 px-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap ${
+              className={`flex-1 min-w-0 py-2 px-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap text-center ${
                 activeTab === tab.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
               }`}>
-              <span className="mr-1">{tab.icon}</span>{tab.label}
+              <span className="mr-0.5">{tab.icon}</span>{tab.label}
             </button>
           ))}
         </div>
