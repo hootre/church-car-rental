@@ -153,6 +153,14 @@ export default function CalendarView() {
         });
       });
 
+      // 일정이 긴 것부터 먼저 배치 (기간 내림차순, 같으면 시작일 오름차순)
+      intersecting.sort((a, b) => {
+        const aDays = Math.round((new Date(a.end_date + "T00:00:00").getTime() - new Date(a.start_date + "T00:00:00").getTime()) / (1000 * 60 * 60 * 24));
+        const bDays = Math.round((new Date(b.end_date + "T00:00:00").getTime() - new Date(b.start_date + "T00:00:00").getTime()) / (1000 * 60 * 60 * 24));
+        if (bDays !== aDays) return bDays - aDays;
+        return a.start_date.localeCompare(b.start_date);
+      });
+
       // 각 예약에 대해 바 정보 계산
       const weekBars: EventBar[] = [];
 
@@ -380,14 +388,16 @@ export default function CalendarView() {
 
                   {/* 데스크탑: 이벤트 바 영역 (항상 최소 높이 확보) */}
                   {(() => {
-                    // 각 열(요일)별 숨겨진 바 수 계산
+                    // 각 열(요일)별 실제 초과 예약 수 계산
+                    // = 해당 날짜 총 예약 수 - 해당 열에서 보이는 바(lane<3) 수
                     const overflowByCol: number[] = [0, 0, 0, 0, 0, 0, 0];
-                    bars.forEach((bar) => {
-                      if (bar.lane >= 3) {
-                        for (let c = bar.startCol; c <= bar.endCol; c++) {
-                          overflowByCol[c]++;
-                        }
-                      }
+                    weekDays.forEach((dayInfo, col) => {
+                      const dateStr = dayInfo.date.toISOString().split("T")[0];
+                      const totalForDay = (reservationsByDate[dateStr] || []).length;
+                      const visibleForCol = bars.filter(
+                        (bar) => bar.lane < 3 && bar.startCol <= col && bar.endCol >= col
+                      ).length;
+                      overflowByCol[col] = Math.max(totalForDay - visibleForCol, 0);
                     });
                     const hasOverflow = overflowByCol.some((v) => v > 0);
                     const totalHeight = Math.max(barLaneCount * 26 + 6, 52) + (hasOverflow ? 20 : 0);
