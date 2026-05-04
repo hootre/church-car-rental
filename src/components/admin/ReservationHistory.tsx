@@ -461,6 +461,11 @@ export default function ReservationHistory() {
                           {r.staff_approved_at ? "✓ 승인" : "⏳ 대기"}
                         </div>
                         <div className="text-[10px] text-gray-400 mt-0.5">차량담당 장로</div>
+                        {r.staff_approved_at && getAdminName(r.staff_approved_by) !== "-" && (
+                          <div className="text-[10px] text-emerald-600 font-medium">
+                            {getAdminName(r.staff_approved_by)}
+                          </div>
+                        )}
                       </div>
                       <div className="w-px bg-gray-200" />
                       <div className="flex-1 text-center">
@@ -468,6 +473,11 @@ export default function ReservationHistory() {
                           {r.manager_approved_at ? "✓ 승인" : "⏳ 대기"}
                         </div>
                         <div className="text-[10px] text-gray-400 mt-0.5">기획장로</div>
+                        {r.manager_approved_at && getAdminName(r.manager_approved_by) !== "-" && (
+                          <div className="text-[10px] text-green-600 font-medium">
+                            {getAdminName(r.manager_approved_by)}
+                          </div>
+                        )}
                       </div>
                     </div>
 

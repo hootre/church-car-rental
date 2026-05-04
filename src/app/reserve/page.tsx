@@ -16,7 +16,7 @@ export default function ReservePage() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [filterType, setFilterType] = useState("all");
-  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [selectedVehicles, setSelectedVehicles] = useState<Vehicle[]>([]);
 
   const [form, setForm] = useState({
     guest_name: "",
@@ -24,13 +24,15 @@ export default function ReservePage() {
     department: "",
     purpose: "",
     destination: "",
-    passenger_count: "",
-    driver_name: "",
     start_date: "",
     start_time: "09:00",
     end_date: "",
     end_time: "18:00",
   });
+
+  const [vehicleDetails, setVehicleDetails] = useState<
+    Record<string, { driver_name: string; passenger_count: string }>
+  >({});
 
   useEffect(() => {
     const today = new Date().toISOString().split("T")[0];
@@ -45,17 +47,18 @@ export default function ReservePage() {
     form.department.trim() &&
     form.purpose.trim() &&
     form.destination.trim() &&
-    form.driver_name.trim();
+    selectedVehicles.every((v) => vehicleDetails[v.id]?.driver_name?.trim());
 
   async function fetchAvailableVehicles() {
     setLoading(true);
-    setSelectedVehicle(null);
+    setSelectedVehicles([]);
+    setVehicleDetails({});
 
     const { data: allVehicles, error: vError } = await supabase
       .from("vehicles")
       .select("*")
       .eq("available", true)
-      .order("sort_order", { ascending: true });
+      .order("capacity", { ascending: false });
 
     if (vError) {
       toast.error("차량 목록을 불러오지 못했습니다");
@@ -94,30 +97,70 @@ export default function ReservePage() {
       ? availableVehicles
       : availableVehicles.filter((v) => v.type === filterType);
 
+  function toggleVehicleSelection(vehicle: Vehicle) {
+    setSelectedVehicles((prev) => {
+      const isSelected = prev.some((v) => v.id === vehicle.id);
+      if (isSelected) {
+        return prev.filter((v) => v.id !== vehicle.id);
+      } else {
+        return [...prev, vehicle];
+      }
+    });
+  }
+
+  function handleVehicleDetailChange(
+    vehicleId: string,
+    field: "driver_name" | "passenger_count",
+    value: string
+  ) {
+    setVehicleDetails((prev) => ({
+      ...prev,
+      [vehicleId]: {
+        ...prev[vehicleId],
+        [field]: value,
+      },
+    }));
+  }
+
   async function handleSubmit() {
-    if (!selectedVehicle || !isFormValid) return;
+    if (selectedVehicles.length === 0 || !isFormValid) return;
 
     setSubmitting(true);
-    const { error } = await supabase.from("reservations").insert({
-      vehicle_id: selectedVehicle.id,
-      guest_name: form.guest_name.trim(),
-      phone: form.phone.trim(),
-      department: form.department.trim(),
-      purpose: form.purpose.trim(),
-      destination: form.destination.trim(),
-      passenger_count: form.passenger_count ? parseInt(form.passenger_count) : null,
-      driver_name: form.driver_name.trim(),
-      start_date: form.start_date,
-      start_time: form.start_time,
-      end_date: form.end_date,
-      end_time: form.end_time,
-    });
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (const vehicle of selectedVehicles) {
+      const details = vehicleDetails[vehicle.id];
+      const { error } = await supabase.from("reservations").insert({
+        vehicle_id: vehicle.id,
+        guest_name: form.guest_name.trim(),
+        phone: form.phone.trim(),
+        department: form.department.trim(),
+        purpose: form.purpose.trim(),
+        destination: form.destination.trim(),
+        passenger_count: details.passenger_count ? parseInt(details.passenger_count) : null,
+        driver_name: details.driver_name.trim(),
+        start_date: form.start_date,
+        start_time: form.start_time,
+        end_date: form.end_date,
+        end_time: form.end_time,
+      });
+
+      if (error) {
+        failureCount++;
+      } else {
+        successCount++;
+      }
+    }
 
     setSubmitting(false);
-    if (error) {
-      toast.error("예약 신청에 실패했습니다. 다시 시도해 주세요.");
+
+    if (failureCount > 0) {
+      toast.error(
+        `${successCount}건 예약이 완료되었으나, ${failureCount}건이 실패했습니다. 다시 시도해 주세요.`
+      );
     } else {
-      toast.success("예약이 신청되었습니다!");
+      toast.success(`${successCount}건 예약이 신청되었습니다!`);
       router.push("/check");
     }
   }
@@ -208,6 +251,14 @@ export default function ReservePage() {
               </p>
             </div>
 
+            {selectedVehicles.length > 0 && (
+              <div className="mb-4 p-3 bg-primary-50 rounded-lg border border-primary-200">
+                <p className="text-sm font-medium text-primary-700">
+                  {selectedVehicles.length}대 선택됨
+                </p>
+              </div>
+            )}
+
             {vehicleTypes.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
                 <button onClick={() => setFilterType("all")}
@@ -233,14 +284,15 @@ export default function ReservePage() {
               <div className="space-y-3">
                 {filteredVehicles.map((vehicle) => (
                   <VehicleCard key={vehicle.id} vehicle={vehicle}
-                    selected={selectedVehicle?.id === vehicle.id} onSelect={setSelectedVehicle} />
+                    selected={selectedVehicles.some((v) => v.id === vehicle.id)}
+                    onSelect={() => toggleVehicleSelection(vehicle)} />
                 ))}
               </div>
             )}
 
             <div className="mt-6 flex gap-3">
-              <button onClick={() => { setStep("schedule"); setSelectedVehicle(null); setFilterType("all"); }} className="btn-outline">이전</button>
-              <button onClick={() => setStep("form")} disabled={!selectedVehicle} className="btn-primary">다음</button>
+              <button onClick={() => { setStep("schedule"); setSelectedVehicles([]); setVehicleDetails({}); setFilterType("all"); }} className="btn-outline">이전</button>
+              <button onClick={() => setStep("form")} disabled={selectedVehicles.length === 0} className="btn-primary">다음</button>
             </div>
           </div>
         )}
@@ -250,10 +302,8 @@ export default function ReservePage() {
           <div>
             <h2 className="text-xl font-bold text-gray-900 mb-1">차량 신청서 작성</h2>
             <p className="text-sm text-gray-500 mb-4">
-              <span className="font-medium text-primary-600">{selectedVehicle?.name}</span>
-              {selectedVehicle?.plate_number && (
-                <span className="text-gray-400 ml-1">({selectedVehicle.plate_number})</span>
-              )}
+              <span className="font-medium text-primary-600">{selectedVehicles.length}대의 차량</span>
+              에 대한 정보를 입력해주세요
             </p>
 
             <div className="space-y-4">
@@ -270,18 +320,31 @@ export default function ReservePage() {
                   placeholder="예: 양평 수련원, 서울역 등" className="input-field" />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">탑승인원</label>
-                  <input type="number" name="passenger_count" value={form.passenger_count} onChange={handleInput}
-                    placeholder="0" min="1" className="input-field" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">차량운전자 *</label>
-                  <input type="text" name="driver_name" value={form.driver_name} onChange={handleInput}
-                    placeholder="운전자 이름" className="input-field" />
-                </div>
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-xs text-gray-400 mb-3">차량별 정보</p>
               </div>
+
+              {selectedVehicles.map((vehicle) => (
+                <div key={vehicle.id} className="card p-4 bg-gray-50">
+                  <h4 className="font-medium text-gray-900 mb-3">
+                    {vehicle.name} ({vehicle.capacity}인승)
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">차량운전자 *</label>
+                      <input type="text" value={vehicleDetails[vehicle.id]?.driver_name || ""}
+                        onChange={(e) => handleVehicleDetailChange(vehicle.id, "driver_name", e.target.value)}
+                        placeholder="운전자 이름" className="input-field" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">탑승인원</label>
+                      <input type="number" value={vehicleDetails[vehicle.id]?.passenger_count || ""}
+                        onChange={(e) => handleVehicleDetailChange(vehicle.id, "passenger_count", e.target.value)}
+                        placeholder="0" min="1" className="input-field" />
+                    </div>
+                  </div>
+                </div>
+              ))}
 
               <div className="border-t border-gray-100 pt-4">
                 <p className="text-xs text-gray-400 mb-3">신청자 정보</p>
@@ -322,11 +385,26 @@ export default function ReservePage() {
             <div className="card space-y-3">
               <ConfirmRow label="사용일시" value={`${form.start_date} ${form.start_time} ~ ${form.end_date} ${form.end_time}`} />
               <div className="border-t border-gray-100 my-2" />
-              <ConfirmRow label="차량" value={`${selectedVehicle?.name || ""} (${selectedVehicle?.plate_number || ""})`} />
               <ConfirmRow label="사용목적" value={form.purpose} />
               <ConfirmRow label="행선지" value={form.destination} />
-              {form.passenger_count && <ConfirmRow label="탑승인원" value={`${form.passenger_count}명`} />}
-              <ConfirmRow label="차량운전자" value={form.driver_name} />
+
+              <div className="border-t border-gray-100 my-2" />
+              <p className="text-xs text-gray-500 font-medium mb-2">차량 정보</p>
+
+              {selectedVehicles.map((vehicle, idx) => (
+                <div key={vehicle.id} className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-sm font-medium text-gray-900 mb-2">
+                    {idx + 1}. {vehicle.name} ({vehicle.capacity}인승) - {vehicle.plate_number}
+                  </p>
+                  <div className="space-y-1 text-sm">
+                    <ConfirmRow label="운전자" value={vehicleDetails[vehicle.id]?.driver_name || ""} />
+                    {vehicleDetails[vehicle.id]?.passenger_count && (
+                      <ConfirmRow label="탑승인원" value={`${vehicleDetails[vehicle.id].passenger_count}명`} />
+                    )}
+                  </div>
+                </div>
+              ))}
+
               <div className="border-t border-gray-100 my-2" />
               <ConfirmRow label="신청자" value={form.guest_name} />
               <ConfirmRow label="전화번호" value={form.phone} />
@@ -334,13 +412,13 @@ export default function ReservePage() {
             </div>
 
             <p className="mt-4 text-xs text-gray-400 text-center">
-              신청 후 담당 → 부장 순서로 승인이 완료되면 차량을 이용하실 수 있습니다
+              신청 후 차량담당 장로 → 기획장로 순서로 승인이 완료되면 차량을 이용하실 수 있습니다
             </p>
 
             <div className="mt-6 flex gap-3">
               <button onClick={() => setStep("form")} className="btn-outline">수정</button>
               <button onClick={handleSubmit} disabled={submitting} className="btn-primary">
-                {submitting ? "신청 중..." : "차량 신청"}
+                {submitting ? "신청 중..." : `${selectedVehicles.length}대 차량 신청`}
               </button>
             </div>
           </div>

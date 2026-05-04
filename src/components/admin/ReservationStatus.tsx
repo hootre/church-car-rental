@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import StatusBadge from "@/components/StatusBadge";
 import PhotoUpload from "@/components/PhotoUpload";
 import {
-  supabase, Reservation, statusLabel, statusColor,
+  supabase, Reservation, Admin, statusLabel, statusColor,
   statusTransitions, statusRequiredRole,
 } from "@/lib/supabase";
 
@@ -16,10 +16,25 @@ interface Props {
 
 export default function ReservationStatus({ adminId, adminRole }: Props) {
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [actionNote, setActionNote] = useState("");
+
+  // 관리자 목록 조회
+  useEffect(() => {
+    supabase.from("admins").select("*").then(({ data }) => {
+      setAdmins(data || []);
+    });
+  }, []);
+
+  // 관리자 이름 찾기
+  function getAdminName(adminId: string | null): string {
+    if (!adminId) return "";
+    const admin = admins.find((a) => a.id === adminId);
+    return admin ? admin.name : "";
+  }
 
   const fetchReservations = useCallback(async () => {
     setLoading(true);
@@ -217,9 +232,16 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
                           </div>
                           <div className="text-[10px] text-gray-400 mt-0.5">차량담당 장로</div>
                           {r.staff_approved_at && (
-                            <div className="text-[10px] text-gray-400">
-                              {new Date(r.staff_approved_at).toLocaleDateString("ko-KR")}
-                            </div>
+                            <>
+                              {getAdminName(r.staff_approved_by) && (
+                                <div className="text-[10px] text-emerald-600 font-medium">
+                                  {getAdminName(r.staff_approved_by)}
+                                </div>
+                              )}
+                              <div className="text-[10px] text-gray-400">
+                                {new Date(r.staff_approved_at).toLocaleDateString("ko-KR")}
+                              </div>
+                            </>
                           )}
                         </div>
                         <div className="w-px bg-gray-200" />
@@ -229,9 +251,16 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
                           </div>
                           <div className="text-[10px] text-gray-400 mt-0.5">기획장로</div>
                           {r.manager_approved_at && (
-                            <div className="text-[10px] text-gray-400">
-                              {new Date(r.manager_approved_at).toLocaleDateString("ko-KR")}
-                            </div>
+                            <>
+                              {getAdminName(r.manager_approved_by) && (
+                                <div className="text-[10px] text-green-600 font-medium">
+                                  {getAdminName(r.manager_approved_by)}
+                                </div>
+                              )}
+                              <div className="text-[10px] text-gray-400">
+                                {new Date(r.manager_approved_at).toLocaleDateString("ko-KR")}
+                              </div>
+                            </>
                           )}
                         </div>
                       </div>

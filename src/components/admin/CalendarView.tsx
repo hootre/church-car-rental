@@ -28,6 +28,16 @@ const eventPillColor: Record<string, string> = {
   rejected: "bg-red-100 text-red-700",
 };
 
+interface EventBar {
+  id: string;
+  reservation: Reservation;
+  startCol: number;
+  endCol: number;
+  lane: number;
+  startsInWeek: boolean;
+  endsInWeek: boolean;
+}
+
 export default function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -115,6 +125,102 @@ export default function CalendarView() {
 
     return days;
   }, [year, month]);
+
+  // 각 주별 이벤트 바 계산
+  const weekEventBars = useMemo(() => {
+    const bars: EventBar[][] = [];
+
+    for (let weekIdx = 0; weekIdx < calendarDays.length / 7; weekIdx++) {
+      const weekStart = weekIdx * 7;
+      const weekEnd = weekStart + 7;
+      const weekDays = calendarDays.slice(weekStart, weekEnd);
+
+      // 이 주와 겹치는 모든 예약 찾기
+      const intersectingReservations = new Set<Reservation>();
+
+      weekDays.forEach((day) => {
+        const dateStr = day.date.toISOString().split("T")[0];
+        const dayResevations = reservationsByDate[dateStr] || [];
+        dayResevations.forEach((r) => intersectingReservations.add(r));
+      });
+
+      // 각 예약에 대해 시작/종료 열 계산 및 레인 할당
+      const weekBars: EventBar[] = [];
+      const laneMap = new Map<string, number>();
+
+      Array.from(intersectingReservations).forEach((reservation) => {
+        const resStart = new Date(reservation.start_date + "T00:00:00");
+        const resEnd = new Date(reservation.end_date + "T00:00:00");
+        const weekStartDate = weekDays[0].date;
+        const weekEndDate = weekDays[6].date;
+
+        // 이 주에서의 시작/종료 열
+        let startCol = 0;
+        let endCol = 6;
+        let startsInWeek = false;
+        let endsInWeek = false;
+
+        if (resStart >= weekStartDate && resStart <= weekEndDate) {
+          startCol = resStart.getDay();
+          startsInWeek = true;
+        }
+
+        if (resEnd >= weekStartDate && resEnd <= weekEndDate) {
+          endCol = resEnd.getDay();
+          endsInWeek = true;
+        }
+
+        if (resStart < weekStartDate) {
+          startCol = 0;
+        }
+
+        if (resEnd > weekEndDate) {
+          endCol = 6;
+        }
+
+        // 레인 할당 (겹치는 다른 바들과의 충돌 확인)
+        let lane = 0;
+        let assigned = false;
+
+        while (!assigned) {
+          let conflict = false;
+
+          for (const existingBar of weekBars) {
+            if (existingBar.lane === lane) {
+              // 이 레인의 다른 바와 겹치는지 확인
+              if (
+                !(existingBar.endCol < startCol || existingBar.startCol > endCol)
+              ) {
+                conflict = true;
+                break;
+              }
+            }
+          }
+
+          if (!conflict) {
+            assigned = true;
+            laneMap.set(reservation.id, lane);
+          } else {
+            lane++;
+          }
+        }
+
+        weekBars.push({
+          id: reservation.id,
+          reservation,
+          startCol,
+          endCol,
+          lane,
+          startsInWeek,
+          endsInWeek,
+        });
+      });
+
+      bars.push(weekBars);
+    }
+
+    return bars;
+  }, [calendarDays, reservationsByDate]);
 
   function goToPrevMonth() {
     setCurrentDate(new Date(year, month - 1, 1));
@@ -212,6 +318,7 @@ export default function CalendarView() {
               const isToday = dateStr === todayStr;
               const isSelected = dateStr === selectedDate;
               const dayOfWeek = date.getDay();
+              const weekIdx = Math.floor(idx / 7);
 
               return (
                 <button
@@ -262,33 +369,65 @@ export default function CalendarView() {
                       )}
                     </div>
                   )}
-
-                  {/* 데스크탑: 텍스트 이벤트 레이블 */}
-                  {dayReservations.length > 0 && (
-                    <div className="hidden md:flex flex-col gap-1 w-full flex-1 overflow-hidden">
-                      {dayReservations.slice(0, 3).map((r, i) => (
-                        <div
-                          key={i}
-                          className={`text-[10px] px-1.5 py-0.5 rounded truncate font-medium whitespace-nowrap
-                            ${eventPillColor[r.status] || "bg-gray-100 text-gray-700"}
-                          `}
-                          title={`${r.vehicles?.name || "차량"} ${r.guest_name}`}
-                        >
-                          {r.vehicles?.name} {r.guest_name}
-                        </div>
-                      ))}
-                      {dayReservations.length > 3 && (
-                        <div className="text-[10px] text-gray-500 px-1.5 py-0.5">
-                          +{dayReservations.length - 3} more
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </button>
               );
             })}
           </div>
         )}
+      </div>
+
+      {/* 데스크탑: 멀티데이 예약 바 오버레이 */}
+      <div className="hidden md:block mb-4 space-y-2">
+        {weekEventBars.map((weekBars, weekIdx) => {
+          const weekStart = weekIdx * 7;
+          const visibleBars = weekBars.slice(0, 3);
+          const hiddenCount = weekBars.length > 3 ? weekBars.length - 3 : 0;
+
+          return (
+            <div key={`week-${weekIdx}`} className="space-y-1">
+              {visibleBars.map((bar) => {
+                const widthPercent = ((bar.endCol - bar.startCol + 1) / 7) * 100;
+                const leftPercent = (bar.startCol / 7) * 100;
+
+                let borderRadius = "rounded";
+                if (bar.startsInWeek && bar.endsInWeek) {
+                  borderRadius = "rounded";
+                } else if (bar.startsInWeek) {
+                  borderRadius = "rounded-l";
+                } else if (bar.endsInWeek) {
+                  borderRadius = "rounded-r";
+                } else {
+                  borderRadius = "";
+                }
+
+                return (
+                  <div
+                    key={bar.id}
+                    className="relative h-6 flex items-center"
+                    style={{ paddingLeft: `${leftPercent}%` }}
+                  >
+                    <div
+                      className={`h-5 flex items-center px-2 py-0.5 text-[10px] font-medium whitespace-nowrap overflow-hidden
+                        ${eventPillColor[bar.reservation.status] || "bg-gray-100 text-gray-700"}
+                        ${borderRadius}
+                      `}
+                      style={{ width: `${widthPercent}%` }}
+                      title={`${bar.reservation.vehicles?.name || "차량"} ${bar.reservation.guest_name}`}
+                    >
+                      {bar.reservation.vehicles?.name} {bar.reservation.guest_name}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {hiddenCount > 0 && (
+                <div className="text-[10px] text-gray-500 px-3 py-1">
+                  +{hiddenCount} more
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* 이번 달 요약 */}
