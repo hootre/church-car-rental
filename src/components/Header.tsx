@@ -1,25 +1,24 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 
 export default function Header() {
   const pathname = usePathname();
-  const churchName = process.env.NEXT_PUBLIC_CHURCH_NAME || "교회";
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200">
       <div className="max-w-lg mx-auto px-4 py-3">
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M8 7h8m-4-4v4m-6 4h12l-3 9H9l-3-9z" />
-            </svg>
-          </div>
-          <span className="font-bold text-lg text-gray-900">
-            {churchName} <span className="text-primary-600">차량대여</span>
-          </span>
+          <Image
+            src="/logo_dark.png"
+            alt="한국중앙교회"
+            width={164}
+            height={18}
+            className="h-5 w-auto object-contain"
+          />
+          <span className="text-primary-600 font-bold text-lg">차량대여</span>
         </Link>
       </div>
 
