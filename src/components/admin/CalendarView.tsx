@@ -46,6 +46,7 @@ export default function CalendarView() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [popupReservation, setPopupReservation] = useState<Reservation | null>(null);
+  const [dayListDate, setDayListDate] = useState<string | null>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -359,7 +360,13 @@ export default function CalendarView() {
                                 <>
                                   <div className={`w-[5px] h-[5px] rounded-full ${dotColor[dayReservations[0].status]}`} />
                                   <div className={`w-[5px] h-[5px] rounded-full ${dotColor[dayReservations[1].status]}`} />
-                                  <span className="text-[8px] text-gray-400 leading-none">
+                                  <span
+                                    className="text-[8px] text-primary-500 font-bold leading-none"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDayListDate(dateStr);
+                                    }}
+                                  >
                                     +{dayReservations.length - 2}
                                   </span>
                                 </>
@@ -372,60 +379,87 @@ export default function CalendarView() {
                   </div>
 
                   {/* 데스크탑: 이벤트 바 영역 (항상 최소 높이 확보) */}
-                  <div
-                    className="hidden md:block relative border-b border-gray-200"
-                    style={{ height: `${Math.max(barLaneCount * 26 + 6, 52)}px` }}
-                  >
-                    {/* 세로 격자선 */}
-                    {[1, 2, 3, 4, 5, 6].map((col) => (
-                      <div
-                        key={`vline-${col}`}
-                        className="absolute top-0 bottom-0 border-l border-gray-200"
-                        style={{ left: `${(col / 7) * 100}%` }}
-                      />
-                    ))}
-                    {bars
-                      .filter((bar) => bar.lane < 3)
-                      .map((bar) => {
-                        const span = bar.endCol - bar.startCol + 1;
-                        const leftPercent = (bar.startCol / 7) * 100;
-                        const widthPercent = (span / 7) * 100;
+                  {(() => {
+                    // 각 열(요일)별 숨겨진 바 수 계산
+                    const overflowByCol: number[] = [0, 0, 0, 0, 0, 0, 0];
+                    bars.forEach((bar) => {
+                      if (bar.lane >= 3) {
+                        for (let c = bar.startCol; c <= bar.endCol; c++) {
+                          overflowByCol[c]++;
+                        }
+                      }
+                    });
+                    const hasOverflow = overflowByCol.some((v) => v > 0);
+                    const totalHeight = Math.max(barLaneCount * 26 + 6, 52) + (hasOverflow ? 20 : 0);
 
-                        let roundedClass = "rounded";
-                        if (bar.isStart && bar.isEnd) roundedClass = "rounded";
-                        else if (bar.isStart && !bar.isEnd) roundedClass = "rounded-l";
-                        else if (!bar.isStart && bar.isEnd) roundedClass = "rounded-r";
-                        else roundedClass = "rounded-none";
-
-                        return (
-                          <button
-                            key={bar.id}
-                            onClick={() => setPopupReservation(bar.reservation)}
-                            className={`absolute h-[22px] flex items-center px-2 text-[11px] font-medium truncate
-                              cursor-pointer hover:opacity-80 active:opacity-60 transition-opacity
-                              ${barColor[bar.reservation.status] || "bg-gray-300 text-gray-700"}
-                              ${roundedClass}
-                            `}
-                            style={{
-                              top: `${bar.lane * 26 + 4}px`,
-                              left: `${leftPercent}%`,
-                              width: `${widthPercent}%`,
-                            }}
-                            title={`${bar.reservation.vehicles?.name || "차량"} - ${bar.reservation.department} ${bar.reservation.guest_name} (${bar.reservation.start_date} ~ ${bar.reservation.end_date})`}
-                          >
-                            {bar.reservation.vehicles?.name} {bar.reservation.department} {bar.reservation.guest_name}
-                          </button>
-                        );
-                      })}
-                    {bars.length > 3 && maxLane >= 3 && (
+                    return (
                       <div
-                        className="absolute right-1 text-[9px] text-gray-400"
-                        style={{ top: `${3 * 26}px` }}
+                        className="hidden md:block relative border-b border-gray-200"
+                        style={{ height: `${totalHeight}px` }}
                       >
-                        +{bars.filter((b) => b.lane >= 3).length}
+                        {/* 세로 격자선 */}
+                        {[1, 2, 3, 4, 5, 6].map((col) => (
+                          <div
+                            key={`vline-${col}`}
+                            className="absolute top-0 bottom-0 border-l border-gray-200"
+                            style={{ left: `${(col / 7) * 100}%` }}
+                          />
+                        ))}
+                        {bars
+                          .filter((bar) => bar.lane < 3)
+                          .map((bar) => {
+                            const span = bar.endCol - bar.startCol + 1;
+                            const leftPercent = (bar.startCol / 7) * 100;
+                            const widthPercent = (span / 7) * 100;
+
+                            let roundedClass = "rounded";
+                            if (bar.isStart && bar.isEnd) roundedClass = "rounded";
+                            else if (bar.isStart && !bar.isEnd) roundedClass = "rounded-l";
+                            else if (!bar.isStart && bar.isEnd) roundedClass = "rounded-r";
+                            else roundedClass = "rounded-none";
+
+                            return (
+                              <button
+                                key={bar.id}
+                                onClick={() => setPopupReservation(bar.reservation)}
+                                className={`absolute h-[22px] flex items-center px-2 text-[11px] font-medium truncate
+                                  cursor-pointer hover:opacity-80 active:opacity-60 transition-opacity
+                                  ${barColor[bar.reservation.status] || "bg-gray-300 text-gray-700"}
+                                  ${roundedClass}
+                                `}
+                                style={{
+                                  top: `${bar.lane * 26 + 4}px`,
+                                  left: `${leftPercent}%`,
+                                  width: `${widthPercent}%`,
+                                }}
+                                title={`${bar.reservation.vehicles?.name || "차량"} - ${bar.reservation.department} ${bar.reservation.guest_name} (${bar.reservation.start_date} ~ ${bar.reservation.end_date})`}
+                              >
+                                {bar.reservation.vehicles?.name} {bar.reservation.department} {bar.reservation.guest_name}
+                              </button>
+                            );
+                          })}
+                        {/* 열별 +더보기 버튼 */}
+                        {overflowByCol.map((count, col) => {
+                          if (count === 0) return null;
+                          const colDateStr = weekDays[col].date.toISOString().split("T")[0];
+                          return (
+                            <button
+                              key={`more-${col}`}
+                              onClick={() => setDayListDate(colDateStr)}
+                              className="absolute text-[10px] text-primary-500 font-semibold hover:text-primary-700 hover:underline transition-colors truncate px-1"
+                              style={{
+                                top: `${3 * 26 + 4}px`,
+                                left: `${(col / 7) * 100}%`,
+                                width: `${(1 / 7) * 100}%`,
+                              }}
+                            >
+                              +{count} 더보기
+                            </button>
+                          );
+                        })}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()}
                 </div>
               );
             })}
@@ -530,6 +564,87 @@ export default function CalendarView() {
           </div>
         </div>
       )}
+
+      {/* 날짜별 일정 목록 팝업 */}
+      {dayListDate && (() => {
+        const dayRes = reservationsByDate[dayListDate] || [];
+        const dateObj = new Date(dayListDate + "T00:00:00");
+        const dateLabel = dateObj.toLocaleDateString("ko-KR", {
+          month: "long",
+          day: "numeric",
+          weekday: "short",
+        });
+
+        return (
+          <div
+            className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center sm:p-4"
+            onClick={() => setDayListDate(null)}
+          >
+            <div
+              className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[85vh] sm:max-h-[80vh] overflow-y-auto shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* 헤더 */}
+              <div className="sticky top-0 bg-white rounded-t-2xl border-b border-gray-100 px-4 py-3 flex items-center justify-between z-10">
+                <div>
+                  <h3 className="font-bold text-gray-900">{dateLabel}</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">{dayRes.length}건의 예약</p>
+                </div>
+                <button
+                  onClick={() => setDayListDate(null)}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* 예약 리스트 */}
+              <div className="px-4 py-3 space-y-2">
+                {dayRes.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400 text-sm">이 날짜에 예약이 없습니다</div>
+                ) : (
+                  dayRes.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => {
+                        setDayListDate(null);
+                        setPopupReservation(r);
+                      }}
+                      className="w-full text-left bg-gray-50 rounded-xl p-3 hover:bg-gray-100 active:scale-[0.98] transition-all"
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColor[r.status]}`} />
+                          <span className="font-bold text-sm text-gray-900 truncate">
+                            {r.vehicles?.name}
+                          </span>
+                          <StatusBadge status={r.status} />
+                        </div>
+                        <svg className="w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                      <div className="text-xs text-gray-500 space-y-0.5 pl-[18px]">
+                        <div className="flex justify-between gap-3">
+                          <span>{r.guest_name} ({r.department})</span>
+                          <span className="text-gray-400 shrink-0">
+                            {r.start_time?.slice(0, 5)} ~ {r.end_time?.slice(0, 5)}
+                          </span>
+                        </div>
+                        {r.destination && (
+                          <div className="text-gray-400 truncate">행선지: {r.destination}</div>
+                        )}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 이번 달 요약 */}
       {!selectedDate && (
