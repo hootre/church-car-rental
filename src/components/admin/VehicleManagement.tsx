@@ -8,7 +8,6 @@ import {
 } from "@/lib/supabase";
 import StatusBadge from "@/components/StatusBadge";
 
-type ViewMode = "list" | "detail";
 type DetailTab = "info" | "insurance" | "maintenance" | "history";
 type VehicleStatus = "available" | "in_use" | "unavailable";
 
@@ -271,7 +270,6 @@ function VehicleCard({ v, status, onLoadDetail, onToggleAvailable }: VehicleCard
 export default function VehicleManagement() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>("info");
 
@@ -359,7 +357,6 @@ export default function VehicleManagement() {
   // 차량 상세 로드
   async function loadVehicleDetail(vehicle: Vehicle) {
     setSelectedVehicle(vehicle);
-    setViewMode("detail");
     setDetailTab("info");
     setEditingInfo(false);
     setLoadingDetail(true);
@@ -530,7 +527,6 @@ export default function VehicleManagement() {
       toast.error("삭제에 실패했습니다");
     } else {
       toast.success("차량이 삭제되었습니다");
-      setViewMode("list");
       setSelectedVehicle(null);
       fetchVehicles();
     }
@@ -614,516 +610,526 @@ export default function VehicleManagement() {
   const sharedVehicles = vehicles.filter((v) => (v.category || "shared") === "shared");
   const personalVehicles = vehicles.filter((v) => v.category === "personal");
 
-  // ========== 리스트 뷰 ==========
-  if (viewMode === "list") {
-    return (
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-gray-900">
-            차량 목록 <span className="text-sm font-normal text-gray-400">({vehicles.length}대)</span>
-          </h3>
-          <button
-            onClick={() => setShowAddVehicle(!showAddVehicle)}
-            className="flex items-center gap-1 px-4 py-2 bg-primary-600 text-white text-sm font-semibold rounded-xl hover:bg-primary-700 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            차량 추가
-          </button>
-        </div>
-
-        {/* 차량 추가 폼 */}
-        {showAddVehicle && (
-          <>
-            <h4 className="font-bold text-sm text-gray-900 mb-2">새 차량 등록</h4>
-            <VehicleForm
-              form={addForm}
-              setForm={setAddForm}
-              onSubmit={handleAddVehicle}
-              submitLabel="등록"
-              onCancel={() => setShowAddVehicle(false)}
-            />
-          </>
-        )}
-
-        {/* 상태 요약 */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <div className="bg-green-50 rounded-xl p-2.5 text-center">
-            <div className="text-lg font-bold text-green-700">{statusCounts.available}</div>
-            <div className="text-[10px] text-green-600">사용가능</div>
-          </div>
-          <div className="bg-blue-50 rounded-xl p-2.5 text-center">
-            <div className="text-lg font-bold text-blue-700">{statusCounts.in_use}</div>
-            <div className="text-[10px] text-blue-600">사용중</div>
-          </div>
-          <div className="bg-red-50 rounded-xl p-2.5 text-center">
-            <div className="text-lg font-bold text-red-700">{statusCounts.unavailable}</div>
-            <div className="text-[10px] text-red-600">사용불가</div>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
-        ) : (
-          <>
-            {/* 공유차량 섹션 */}
-            <div className="mb-6">
-              <div className="flex items-center gap-2 mb-3">
-                <h4 className="font-bold text-sm text-gray-900">공유차량</h4>
-                <span className="text-xs text-gray-400">({sharedVehicles.length}대)</span>
-              </div>
-              {sharedVehicles.length === 0 ? (
-                <div className="text-center py-6 text-gray-400 text-sm">공유차량이 없습니다</div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {sharedVehicles.map((v) => (
-                    <VehicleCard
-                      key={v.id}
-                      v={v}
-                      status={getVehicleStatus(v)}
-                      onLoadDetail={loadVehicleDetail}
-                      onToggleAvailable={toggleAvailable}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* 개인차량 섹션 */}
-            {personalVehicles.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="flex items-center gap-1.5">
-                    <h4 className="font-bold text-sm text-gray-900">개인차량</h4>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
-                      비공유
-                    </span>
-                  </div>
-                  <span className="text-xs text-gray-400">({personalVehicles.length}대)</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {personalVehicles.map((v) => (
-                    <VehicleCard
-                      key={v.id}
-                      v={v}
-                      status={getVehicleStatus(v)}
-                      onLoadDetail={loadVehicleDetail}
-                      onToggleAvailable={toggleAvailable}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    );
+  // ========== 팝업 닫기 ==========
+  function closeDetail() {
+    setSelectedVehicle(null);
+    setEditingInfo(false);
+    setShowInsuranceForm(false);
+    setShowMaintenanceForm(false);
+    setSelectedHistory(null);
   }
 
-  // ========== 상세 뷰 ==========
-  if (!selectedVehicle) return null;
-
-  const selectedStatus = getVehicleStatus(selectedVehicle);
-  const selectedCfg = statusConfig[selectedStatus];
+  const selectedStatus = selectedVehicle ? getVehicleStatus(selectedVehicle) : null;
+  const selectedCfg = selectedStatus ? statusConfig[selectedStatus] : null;
 
   return (
     <div>
-      {/* 뒤로가기 */}
-      <button
-        onClick={() => {
-          setViewMode("list");
-          setSelectedVehicle(null);
-          setEditingInfo(false);
-        }}
-        className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        차량 목록
-      </button>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-bold text-gray-900">
+          차량 목록 <span className="text-sm font-normal text-gray-400">({vehicles.length}대)</span>
+        </h3>
+        <button
+          onClick={() => setShowAddVehicle(!showAddVehicle)}
+          className="flex items-center gap-1 px-4 py-2 bg-primary-600 text-white text-sm font-semibold rounded-xl hover:bg-primary-700 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          차량 추가
+        </button>
+      </div>
 
-      {/* 차량 헤더 */}
-      <div className="card mb-4">
-        <div className="flex items-center gap-3">
-          <span className="text-3xl">
-            {selectedVehicle.type === "bus"
-              ? "🚌"
-              : selectedVehicle.type === "van"
-                ? "🚐"
-                : selectedVehicle.type === "truck"
-                  ? "🚛"
-                  : "🚗"}
-          </span>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-bold text-lg text-gray-900">{selectedVehicle.name}</h3>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${selectedCfg.bg} ${selectedCfg.text}`}>
-                {selectedCfg.label}
-              </span>
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                  (selectedVehicle.category || "shared") === "shared"
-                    ? "bg-blue-50 text-blue-600"
-                    : "bg-amber-100 text-amber-700"
-                }`}
-              >
-                {categoryLabel[selectedVehicle.category || "shared"]}
-              </span>
-            </div>
-            <p className="text-sm text-gray-500">
-              {selectedVehicle.plate_number} · {selectedVehicle.year}년식 · {vehicleTypeLabel[selectedVehicle.type]} ·
-              {selectedVehicle.capacity}인승
-            </p>
-          </div>
+      {/* 차량 추가 폼 */}
+      {showAddVehicle && (
+        <>
+          <h4 className="font-bold text-sm text-gray-900 mb-2">새 차량 등록</h4>
+          <VehicleForm
+            form={addForm}
+            setForm={setAddForm}
+            onSubmit={handleAddVehicle}
+            submitLabel="등록"
+            onCancel={() => setShowAddVehicle(false)}
+          />
+        </>
+      )}
+
+      {/* 상태 요약 */}
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <div className="bg-green-50 rounded-xl p-2.5 text-center">
+          <div className="text-lg font-bold text-green-700">{statusCounts.available}</div>
+          <div className="text-[10px] text-green-600">사용가능</div>
+        </div>
+        <div className="bg-blue-50 rounded-xl p-2.5 text-center">
+          <div className="text-lg font-bold text-blue-700">{statusCounts.in_use}</div>
+          <div className="text-[10px] text-blue-600">사용중</div>
+        </div>
+        <div className="bg-red-50 rounded-xl p-2.5 text-center">
+          <div className="text-lg font-bold text-red-700">{statusCounts.unavailable}</div>
+          <div className="text-[10px] text-red-600">사용불가</div>
         </div>
       </div>
 
-      {/* 탭 */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4">
-        {(
-          [
-            { key: "info", label: "기본정보" },
-            { key: "insurance", label: "보험내역" },
-            { key: "maintenance", label: "정비내역" },
-            { key: "history", label: "사용기록" },
-          ] as { key: DetailTab; label: string }[]
-        ).map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => {
-              setDetailTab(tab.key);
-              setEditingInfo(false);
-            }}
-            className={`flex-1 py-2 px-2 text-sm font-medium rounded-lg transition-all ${
-              detailTab === tab.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {loadingDetail ? (
+      {loading ? (
         <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
       ) : (
         <>
-          {/* ===== 기본정보 탭 ===== */}
-          {detailTab === "info" && !editingInfo && (
-            <div>
-              <div className="card space-y-2">
-                <InfoRow label="차량명" value={selectedVehicle.name} />
-                <InfoRow label="차량번호" value={selectedVehicle.plate_number} />
-                <InfoRow label="차종" value={vehicleTypeLabel[selectedVehicle.type] || selectedVehicle.type} />
-                <InfoRow label="분류" value={categoryLabel[selectedVehicle.category || "shared"]} />
-                <InfoRow label="연식" value={`${selectedVehicle.year}년`} />
-                <InfoRow label="승차정원" value={`${selectedVehicle.capacity}명`} />
-                <InfoRow label="연령제한" value={selectedVehicle.age_limit || "-"} />
-                {selectedVehicle.description && <InfoRow label="비고" value={selectedVehicle.description} />}
-                <div className="border-t border-gray-100 pt-2 mt-2">
-                  <p className="text-xs text-gray-400 mb-1">현재 보험</p>
-                  <InfoRow label="보험사" value={selectedVehicle.insurance_company || "-"} />
-                  <InfoRow label="사고접수" value={selectedVehicle.insurance_phone || "-"} />
-                  <InfoRow label="만기일" value={selectedVehicle.insurance_expiry || "-"} />
-                  <InfoRow
-                    label="설계사"
-                    value={`${selectedVehicle.insurance_agent || "-"} (${selectedVehicle.insurance_agent_phone || "-"})`}
+          {/* 공유차량 섹션 */}
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <h4 className="font-bold text-sm text-gray-900">공유차량</h4>
+              <span className="text-xs text-gray-400">({sharedVehicles.length}대)</span>
+            </div>
+            {sharedVehicles.length === 0 ? (
+              <div className="text-center py-6 text-gray-400 text-sm">공유차량이 없습니다</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {sharedVehicles.map((v) => (
+                  <VehicleCard
+                    key={v.id}
+                    v={v}
+                    status={getVehicleStatus(v)}
+                    onLoadDetail={loadVehicleDetail}
+                    onToggleAvailable={toggleAvailable}
                   />
-                </div>
+                ))}
               </div>
-              <div className="flex gap-2 mt-3">
-                <button
-                  onClick={startEditInfo}
-                  className="flex-1 py-2 bg-primary-50 text-primary-600 text-sm font-medium rounded-xl hover:bg-primary-100 transition-colors"
-                >
-                  정보 수정
-                </button>
-                <button
-                  onClick={handleDeleteVehicle}
-                  className="py-2 px-4 bg-red-50 text-red-500 text-sm font-medium rounded-xl hover:bg-red-100 transition-colors"
-                >
-                  삭제
-                </button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* ===== 기본정보 수정 모드 ===== */}
-          {detailTab === "info" && editingInfo && (
-            <VehicleForm
-              form={editForm}
-              setForm={setEditForm}
-              onSubmit={handleSaveInfo}
-              submitLabel="저장"
-              onCancel={() => setEditingInfo(false)}
-            />
-          )}
-
-          {/* ===== 보험내역 탭 ===== */}
-          {detailTab === "insurance" && (
+          {/* 개인차량 섹션 */}
+          {personalVehicles.length > 0 && (
             <div>
-              <div className="flex justify-between items-center mb-3">
-                <p className="text-sm text-gray-500">{insurances.length}건</p>
-                <button
-                  onClick={() => setShowInsuranceForm(!showInsuranceForm)}
-                  className="text-xs px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-medium"
-                >
-                  {showInsuranceForm ? "취소" : "+ 추가"}
-                </button>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-1.5">
+                  <h4 className="font-bold text-sm text-gray-900">개인차량</h4>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                    비공유
+                  </span>
+                </div>
+                <span className="text-xs text-gray-400">({personalVehicles.length}대)</span>
               </div>
-
-              {showInsuranceForm && (
-                <form onSubmit={handleAddInsurance} className="card !p-3 mb-3 space-y-2">
-                  <input name="company" placeholder="보험사 *" required className="input-field text-sm" />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input name="end_date" type="date" required className="input-field text-sm" />
-                    <input name="coverage_type" placeholder="보장유형" defaultValue="종합보험" className="input-field text-sm" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input name="agent_name" placeholder="설계사" className="input-field text-sm" />
-                    <input name="agent_phone" placeholder="설계사 연락처" className="input-field text-sm" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input name="accident_phone" placeholder="사고접수 번호" className="input-field text-sm" />
-                    <input name="premium" type="number" placeholder="보험료(원)" className="input-field text-sm" />
-                  </div>
-                  <input name="memo" placeholder="메모" className="input-field text-sm" />
-                  <button type="submit" className="btn-primary text-sm !py-2">
-                    저장
-                  </button>
-                </form>
-              )}
-
-              {insurances.length === 0 ? (
-                <div className="text-center py-8 text-gray-400 text-sm">보험 내역이 없습니다</div>
-              ) : (
-                <div className="space-y-2">
-                  {insurances.map((ins) => (
-                    <div key={ins.id} className="card !p-3">
-                      <div className="flex justify-between items-start mb-1">
-                        <div>
-                          <span className="font-bold text-sm text-gray-900">{ins.insurance_company}</span>
-                          <span className="text-xs text-gray-400 ml-2">{ins.coverage_type}</span>
-                        </div>
-                        <button onClick={() => deleteInsurance(ins.id)} className="text-xs text-red-400">
-                          삭제
-                        </button>
-                      </div>
-                      <div className="text-xs text-gray-500 space-y-0.5">
-                        <div>만기: {ins.end_date}</div>
-                        {ins.agent_name && <div>설계사: {ins.agent_name} ({ins.agent_phone})</div>}
-                        {ins.accident_phone && <div>사고접수: {ins.accident_phone}</div>}
-                        {ins.premium > 0 && <div>보험료: {ins.premium.toLocaleString()}원</div>}
-                        {ins.memo && <div className="text-gray-400">{ins.memo}</div>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ===== 정비내역 탭 ===== */}
-          {detailTab === "maintenance" && (
-            <div>
-              <div className="flex justify-between items-center mb-3">
-                <p className="text-sm text-gray-500">{maintenances.length}건</p>
-                <button
-                  onClick={() => setShowMaintenanceForm(!showMaintenanceForm)}
-                  className="text-xs px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-medium"
-                >
-                  {showMaintenanceForm ? "취소" : "+ 추가"}
-                </button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {personalVehicles.map((v) => (
+                  <VehicleCard
+                    key={v.id}
+                    v={v}
+                    status={getVehicleStatus(v)}
+                    onLoadDetail={loadVehicleDetail}
+                    onToggleAvailable={toggleAvailable}
+                  />
+                ))}
               </div>
-
-              {showMaintenanceForm && (
-                <form onSubmit={handleAddMaintenance} className="card !p-3 mb-3 space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <input name="date" type="date" required className="input-field text-sm" />
-                    <select name="type" className="input-field text-sm">
-                      {Object.entries(maintenanceTypeLabel).map(([k, v]) => (
-                        <option key={k} value={k}>
-                          {v}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <input name="description" placeholder="정비 내용 *" required className="input-field text-sm" />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input name="cost" type="number" placeholder="비용(원)" className="input-field text-sm" />
-                    <input name="mileage" type="number" placeholder="주행거리(km)" className="input-field text-sm" />
-                  </div>
-                  <input name="shop" placeholder="정비소" className="input-field text-sm" />
-                  <input name="memo" placeholder="메모" className="input-field text-sm" />
-                  <button type="submit" className="btn-primary text-sm !py-2">
-                    저장
-                  </button>
-                </form>
-              )}
-
-              {maintenances.length === 0 ? (
-                <div className="text-center py-8 text-gray-400 text-sm">정비 내역이 없습니다</div>
-              ) : (
-                <div className="space-y-2">
-                  {maintenances.map((m) => (
-                    <div key={m.id} className="card !p-3">
-                      <div className="flex justify-between items-start mb-1">
-                        <div>
-                          <span className="text-xs px-1.5 py-0.5 bg-gray-100 rounded text-gray-600 mr-1">
-                            {maintenanceTypeLabel[m.maintenance_type] || m.maintenance_type}
-                          </span>
-                          <span className="font-bold text-sm text-gray-900">{m.description}</span>
-                        </div>
-                        <button onClick={() => deleteMaintenance(m.id)} className="text-xs text-red-400">
-                          삭제
-                        </button>
-                      </div>
-                      <div className="text-xs text-gray-500 space-y-0.5">
-                        <div>날짜: {m.maintenance_date}</div>
-                        {m.cost > 0 && <div>비용: {m.cost.toLocaleString()}원</div>}
-                        {m.mileage && <div>주행거리: {m.mileage.toLocaleString()}km</div>}
-                        {m.shop_name && <div>정비소: {m.shop_name}</div>}
-                        {m.memo && <div className="text-gray-400">{m.memo}</div>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ===== 사용기록 탭 ===== */}
-          {detailTab === "history" && (
-            <div>
-              <p className="text-sm text-gray-500 mb-3">{usageHistory.length}건</p>
-
-              {usageHistory.length === 0 ? (
-                <div className="text-center py-8 text-gray-400 text-sm">사용 기록이 없습니다</div>
-              ) : (
-                <div className="space-y-2">
-                  {usageHistory.map((res) => (
-                    <button
-                      key={res.id}
-                      onClick={() => setSelectedHistory(res)}
-                      className="card !p-3 w-full text-left hover:bg-gray-50 active:scale-[0.98] transition-all"
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex items-center gap-2">
-                          <StatusBadge status={res.status} />
-                          <span className="font-bold text-sm text-gray-900">{res.guest_name}</span>
-                        </div>
-                        <span className="text-xs text-gray-400">{res.department}</span>
-                      </div>
-                      <div className="text-xs text-gray-500 space-y-0.5">
-                        <div>
-                          기간: {res.start_date} ~ {res.end_date}
-                        </div>
-                        {res.purpose && <div>용도: {res.purpose}</div>}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* 사용기록 상세 팝업 */}
-              {selectedHistory && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelectedHistory(null)}>
-                  <div className="bg-white rounded-2xl w-full max-w-md max-h-[80vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
-                    {/* 팝업 헤더 */}
-                    <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between rounded-t-2xl">
-                      <h3 className="font-bold text-gray-900">사용기록 상세</h3>
-                      <button
-                        onClick={() => setSelectedHistory(null)}
-                        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
-                      >
-                        <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-
-                    {/* 팝업 내용 */}
-                    <div className="p-5 space-y-4">
-                      {/* 상태 */}
-                      <div className="flex items-center gap-3">
-                        <StatusBadge status={selectedHistory.status} />
-                        <span className="text-sm text-gray-500">{statusLabel[selectedHistory.status]}</span>
-                      </div>
-
-                      {/* 기본 정보 */}
-                      <div className="bg-gray-50 rounded-xl p-4 space-y-2.5">
-                        <HistoryDetailRow label="신청자" value={`${selectedHistory.guest_name} (${selectedHistory.department})`} />
-                        <HistoryDetailRow label="연락처" value={selectedHistory.phone} />
-                        <HistoryDetailRow
-                          label="사용기간"
-                          value={
-                            selectedHistory.start_date === selectedHistory.end_date
-                              ? `${selectedHistory.start_date} ${selectedHistory.start_time?.slice(0, 5)} ~ ${selectedHistory.end_time?.slice(0, 5)}`
-                              : `${selectedHistory.start_date} ${selectedHistory.start_time?.slice(0, 5)} ~ ${selectedHistory.end_date} ${selectedHistory.end_time?.slice(0, 5)}`
-                          }
-                        />
-                        {selectedHistory.purpose && (
-                          <HistoryDetailRow label="사용목적" value={selectedHistory.purpose} />
-                        )}
-                        {selectedHistory.destination && (
-                          <HistoryDetailRow label="행선지" value={selectedHistory.destination} />
-                        )}
-                        {selectedHistory.passenger_count && (
-                          <HistoryDetailRow label="탑승인원" value={`${selectedHistory.passenger_count}명`} />
-                        )}
-                        {selectedHistory.driver_name && (
-                          <HistoryDetailRow label="운전자" value={selectedHistory.driver_name} />
-                        )}
-                      </div>
-
-                      {/* 승인/처리 정보 */}
-                      <div className="bg-gray-50 rounded-xl p-4 space-y-2.5">
-                        <p className="text-xs font-medium text-gray-700 mb-1">처리 현황</p>
-                        <HistoryDetailRow
-                          label="신청일"
-                          value={selectedHistory.created_at ? new Date(selectedHistory.created_at).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"}
-                        />
-                        {selectedHistory.staff_approved_at && (
-                          <HistoryDetailRow
-                            label="1차 승인"
-                            value={new Date(selectedHistory.staff_approved_at).toLocaleDateString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          />
-                        )}
-                        {selectedHistory.manager_approved_at && (
-                          <HistoryDetailRow
-                            label="최종 승인"
-                            value={new Date(selectedHistory.manager_approved_at).toLocaleDateString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          />
-                        )}
-                        {selectedHistory.picked_up_at && (
-                          <HistoryDetailRow
-                            label="대여 시작"
-                            value={new Date(selectedHistory.picked_up_at).toLocaleDateString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          />
-                        )}
-                        {selectedHistory.returned_at && (
-                          <HistoryDetailRow
-                            label="반납 완료"
-                            value={new Date(selectedHistory.returned_at).toLocaleDateString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          />
-                        )}
-                      </div>
-
-                      {/* 관리자 메모 */}
-                      {selectedHistory.admin_note && (
-                        <div className="bg-yellow-50 rounded-xl p-4">
-                          <p className="text-xs font-medium text-yellow-700 mb-1">관리자 메모</p>
-                          <p className="text-sm text-yellow-800">{selectedHistory.admin_note}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </>
+      )}
+
+      {/* ===== 차량 상세 팝업 ===== */}
+      {selectedVehicle && selectedCfg && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+          onClick={closeDetail}
+        >
+          <div className="absolute inset-0 bg-black/50" />
+          <div
+            className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[90vh] sm:max-h-[85vh] overflow-y-auto shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 팝업 헤더 */}
+            <div className="sticky top-0 bg-white rounded-t-2xl border-b border-gray-100 px-4 py-3 flex items-center justify-between z-10">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-2xl shrink-0">
+                  {selectedVehicle.type === "bus"
+                    ? "🚌"
+                    : selectedVehicle.type === "van"
+                      ? "🚐"
+                      : selectedVehicle.type === "truck"
+                        ? "🚛"
+                        : "🚗"}
+                </span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h3 className="font-bold text-lg text-gray-900">{selectedVehicle.name}</h3>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${selectedCfg.bg} ${selectedCfg.text}`}>
+                      {selectedCfg.label}
+                    </span>
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                        (selectedVehicle.category || "shared") === "shared"
+                          ? "bg-blue-50 text-blue-600"
+                          : "bg-amber-100 text-amber-700"
+                      }`}
+                    >
+                      {categoryLabel[selectedVehicle.category || "shared"]}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {selectedVehicle.plate_number} · {selectedVehicle.year}년식 · {vehicleTypeLabel[selectedVehicle.type]} · {selectedVehicle.capacity}인승
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={closeDetail}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors shrink-0"
+              >
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* 탭 */}
+            <div className="px-4 pt-3">
+              <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+                {(
+                  [
+                    { key: "info", label: "기본정보" },
+                    { key: "insurance", label: "보험내역" },
+                    { key: "maintenance", label: "정비내역" },
+                    { key: "history", label: "사용기록" },
+                  ] as { key: DetailTab; label: string }[]
+                ).map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => {
+                      setDetailTab(tab.key);
+                      setEditingInfo(false);
+                    }}
+                    className={`flex-1 py-2 px-2 text-xs font-medium rounded-lg transition-all ${
+                      detailTab === tab.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 탭 컨텐츠 */}
+            <div className="px-4 py-4">
+              {loadingDetail ? (
+                <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+              ) : (
+                <>
+                  {/* ===== 기본정보 탭 ===== */}
+                  {detailTab === "info" && !editingInfo && (
+                    <div>
+                      <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+                        <InfoRow label="차량명" value={selectedVehicle.name} />
+                        <InfoRow label="차량번호" value={selectedVehicle.plate_number} />
+                        <InfoRow label="차종" value={vehicleTypeLabel[selectedVehicle.type] || selectedVehicle.type} />
+                        <InfoRow label="분류" value={categoryLabel[selectedVehicle.category || "shared"]} />
+                        <InfoRow label="연식" value={`${selectedVehicle.year}년`} />
+                        <InfoRow label="승차정원" value={`${selectedVehicle.capacity}명`} />
+                        <InfoRow label="연령제한" value={selectedVehicle.age_limit || "-"} />
+                        {selectedVehicle.description && <InfoRow label="비고" value={selectedVehicle.description} />}
+                        <div className="border-t border-gray-200 pt-2 mt-2">
+                          <p className="text-xs text-gray-400 mb-1">현재 보험</p>
+                          <InfoRow label="보험사" value={selectedVehicle.insurance_company || "-"} />
+                          <InfoRow label="사고접수" value={selectedVehicle.insurance_phone || "-"} />
+                          <InfoRow label="만기일" value={selectedVehicle.insurance_expiry || "-"} />
+                          <InfoRow
+                            label="설계사"
+                            value={`${selectedVehicle.insurance_agent || "-"} (${selectedVehicle.insurance_agent_phone || "-"})`}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={startEditInfo}
+                          className="flex-1 py-2 bg-primary-50 text-primary-600 text-sm font-medium rounded-xl hover:bg-primary-100 transition-colors"
+                        >
+                          정보 수정
+                        </button>
+                        <button
+                          onClick={handleDeleteVehicle}
+                          className="py-2 px-4 bg-red-50 text-red-500 text-sm font-medium rounded-xl hover:bg-red-100 transition-colors"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ===== 기본정보 수정 모드 ===== */}
+                  {detailTab === "info" && editingInfo && (
+                    <VehicleForm
+                      form={editForm}
+                      setForm={setEditForm}
+                      onSubmit={handleSaveInfo}
+                      submitLabel="저장"
+                      onCancel={() => setEditingInfo(false)}
+                    />
+                  )}
+
+                  {/* ===== 보험내역 탭 ===== */}
+                  {detailTab === "insurance" && (
+                    <div>
+                      <div className="flex justify-between items-center mb-3">
+                        <p className="text-sm text-gray-500">{insurances.length}건</p>
+                        <button
+                          onClick={() => setShowInsuranceForm(!showInsuranceForm)}
+                          className="text-xs px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-medium"
+                        >
+                          {showInsuranceForm ? "취소" : "+ 추가"}
+                        </button>
+                      </div>
+
+                      {showInsuranceForm && (
+                        <form onSubmit={handleAddInsurance} className="bg-gray-50 rounded-xl p-3 mb-3 space-y-2">
+                          <input name="company" placeholder="보험사 *" required className="input-field text-sm" />
+                          <div className="grid grid-cols-2 gap-2">
+                            <input name="end_date" type="date" required className="input-field text-sm" />
+                            <input name="coverage_type" placeholder="보장유형" defaultValue="종합보험" className="input-field text-sm" />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input name="agent_name" placeholder="설계사" className="input-field text-sm" />
+                            <input name="agent_phone" placeholder="설계사 연락처" className="input-field text-sm" />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input name="accident_phone" placeholder="사고접수 번호" className="input-field text-sm" />
+                            <input name="premium" type="number" placeholder="보험료(원)" className="input-field text-sm" />
+                          </div>
+                          <input name="memo" placeholder="메모" className="input-field text-sm" />
+                          <button type="submit" className="btn-primary text-sm !py-2">
+                            저장
+                          </button>
+                        </form>
+                      )}
+
+                      {insurances.length === 0 ? (
+                        <div className="text-center py-8 text-gray-400 text-sm">보험 내역이 없습니다</div>
+                      ) : (
+                        <div className="space-y-2">
+                          {insurances.map((ins) => (
+                            <div key={ins.id} className="bg-gray-50 rounded-xl p-3">
+                              <div className="flex justify-between items-start mb-1">
+                                <div>
+                                  <span className="font-bold text-sm text-gray-900">{ins.insurance_company}</span>
+                                  <span className="text-xs text-gray-400 ml-2">{ins.coverage_type}</span>
+                                </div>
+                                <button onClick={() => deleteInsurance(ins.id)} className="text-xs text-red-400">
+                                  삭제
+                                </button>
+                              </div>
+                              <div className="text-xs text-gray-500 space-y-0.5">
+                                <div>만기: {ins.end_date}</div>
+                                {ins.agent_name && <div>설계사: {ins.agent_name} ({ins.agent_phone})</div>}
+                                {ins.accident_phone && <div>사고접수: {ins.accident_phone}</div>}
+                                {ins.premium > 0 && <div>보험료: {ins.premium.toLocaleString()}원</div>}
+                                {ins.memo && <div className="text-gray-400">{ins.memo}</div>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ===== 정비내역 탭 ===== */}
+                  {detailTab === "maintenance" && (
+                    <div>
+                      <div className="flex justify-between items-center mb-3">
+                        <p className="text-sm text-gray-500">{maintenances.length}건</p>
+                        <button
+                          onClick={() => setShowMaintenanceForm(!showMaintenanceForm)}
+                          className="text-xs px-3 py-1.5 bg-primary-50 text-primary-600 rounded-lg font-medium"
+                        >
+                          {showMaintenanceForm ? "취소" : "+ 추가"}
+                        </button>
+                      </div>
+
+                      {showMaintenanceForm && (
+                        <form onSubmit={handleAddMaintenance} className="bg-gray-50 rounded-xl p-3 mb-3 space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <input name="date" type="date" required className="input-field text-sm" />
+                            <select name="type" className="input-field text-sm">
+                              {Object.entries(maintenanceTypeLabel).map(([k, v]) => (
+                                <option key={k} value={k}>
+                                  {v}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <input name="description" placeholder="정비 내용 *" required className="input-field text-sm" />
+                          <div className="grid grid-cols-2 gap-2">
+                            <input name="cost" type="number" placeholder="비용(원)" className="input-field text-sm" />
+                            <input name="mileage" type="number" placeholder="주행거리(km)" className="input-field text-sm" />
+                          </div>
+                          <input name="shop" placeholder="정비소" className="input-field text-sm" />
+                          <input name="memo" placeholder="메모" className="input-field text-sm" />
+                          <button type="submit" className="btn-primary text-sm !py-2">
+                            저장
+                          </button>
+                        </form>
+                      )}
+
+                      {maintenances.length === 0 ? (
+                        <div className="text-center py-8 text-gray-400 text-sm">정비 내역이 없습니다</div>
+                      ) : (
+                        <div className="space-y-2">
+                          {maintenances.map((m) => (
+                            <div key={m.id} className="bg-gray-50 rounded-xl p-3">
+                              <div className="flex justify-between items-start mb-1">
+                                <div>
+                                  <span className="text-xs px-1.5 py-0.5 bg-gray-200 rounded text-gray-600 mr-1">
+                                    {maintenanceTypeLabel[m.maintenance_type] || m.maintenance_type}
+                                  </span>
+                                  <span className="font-bold text-sm text-gray-900">{m.description}</span>
+                                </div>
+                                <button onClick={() => deleteMaintenance(m.id)} className="text-xs text-red-400">
+                                  삭제
+                                </button>
+                              </div>
+                              <div className="text-xs text-gray-500 space-y-0.5">
+                                <div>날짜: {m.maintenance_date}</div>
+                                {m.cost > 0 && <div>비용: {m.cost.toLocaleString()}원</div>}
+                                {m.mileage && <div>주행거리: {m.mileage.toLocaleString()}km</div>}
+                                {m.shop_name && <div>정비소: {m.shop_name}</div>}
+                                {m.memo && <div className="text-gray-400">{m.memo}</div>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ===== 사용기록 탭 ===== */}
+                  {detailTab === "history" && (
+                    <div>
+                      <p className="text-sm text-gray-500 mb-3">{usageHistory.length}건</p>
+
+                      {usageHistory.length === 0 ? (
+                        <div className="text-center py-8 text-gray-400 text-sm">사용 기록이 없습니다</div>
+                      ) : (
+                        <div className="space-y-2">
+                          {usageHistory.map((res) => (
+                            <button
+                              key={res.id}
+                              onClick={() => setSelectedHistory(res)}
+                              className="bg-gray-50 rounded-xl p-3 w-full text-left hover:bg-gray-100 active:scale-[0.98] transition-all"
+                            >
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center gap-2">
+                                  <StatusBadge status={res.status} />
+                                  <span className="font-bold text-sm text-gray-900">{res.guest_name}</span>
+                                </div>
+                                <span className="text-xs text-gray-400">{res.department}</span>
+                              </div>
+                              <div className="text-xs text-gray-500 space-y-0.5">
+                                <div>
+                                  기간: {res.start_date} ~ {res.end_date}
+                                </div>
+                                {res.purpose && <div>용도: {res.purpose}</div>}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 사용기록 상세 팝업 (차량 상세 위에 표시) */}
+      {selectedHistory && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center sm:p-4" onClick={() => setSelectedHistory(null)}>
+          <div className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
+            {/* 팝업 헤더 */}
+            <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between rounded-t-2xl z-10">
+              <h3 className="font-bold text-gray-900">사용기록 상세</h3>
+              <button
+                onClick={() => setSelectedHistory(null)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* 팝업 내용 */}
+            <div className="px-4 py-4 space-y-4">
+              {/* 상태 */}
+              <div className="flex items-center gap-3">
+                <StatusBadge status={selectedHistory.status} />
+                <span className="text-sm text-gray-500">{statusLabel[selectedHistory.status]}</span>
+              </div>
+
+              {/* 기본 정보 */}
+              <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+                <HistoryDetailRow label="신청자" value={`${selectedHistory.guest_name} (${selectedHistory.department})`} />
+                <HistoryDetailRow label="연락처" value={selectedHistory.phone} />
+                <HistoryDetailRow
+                  label="사용기간"
+                  value={
+                    selectedHistory.start_date === selectedHistory.end_date
+                      ? `${selectedHistory.start_date} ${selectedHistory.start_time?.slice(0, 5)} ~ ${selectedHistory.end_time?.slice(0, 5)}`
+                      : `${selectedHistory.start_date} ${selectedHistory.start_time?.slice(0, 5)} ~ ${selectedHistory.end_date} ${selectedHistory.end_time?.slice(0, 5)}`
+                  }
+                />
+                {selectedHistory.purpose && (
+                  <HistoryDetailRow label="사용목적" value={selectedHistory.purpose} />
+                )}
+                {selectedHistory.destination && (
+                  <HistoryDetailRow label="행선지" value={selectedHistory.destination} />
+                )}
+                {selectedHistory.passenger_count && (
+                  <HistoryDetailRow label="탑승인원" value={`${selectedHistory.passenger_count}명`} />
+                )}
+                {selectedHistory.driver_name && (
+                  <HistoryDetailRow label="운전자" value={selectedHistory.driver_name} />
+                )}
+              </div>
+
+              {/* 승인/처리 정보 */}
+              <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+                <p className="text-xs font-medium text-gray-700 mb-1">처리 현황</p>
+                <HistoryDetailRow
+                  label="신청일"
+                  value={selectedHistory.created_at ? new Date(selectedHistory.created_at).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"}
+                />
+                {selectedHistory.staff_approved_at && (
+                  <HistoryDetailRow
+                    label="1차 승인"
+                    value={new Date(selectedHistory.staff_approved_at).toLocaleDateString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  />
+                )}
+                {selectedHistory.manager_approved_at && (
+                  <HistoryDetailRow
+                    label="최종 승인"
+                    value={new Date(selectedHistory.manager_approved_at).toLocaleDateString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  />
+                )}
+                {selectedHistory.picked_up_at && (
+                  <HistoryDetailRow
+                    label="대여 시작"
+                    value={new Date(selectedHistory.picked_up_at).toLocaleDateString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  />
+                )}
+                {selectedHistory.returned_at && (
+                  <HistoryDetailRow
+                    label="반납 완료"
+                    value={new Date(selectedHistory.returned_at).toLocaleDateString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  />
+                )}
+              </div>
+
+              {/* 관리자 메모 */}
+              {selectedHistory.admin_note && (
+                <div className="bg-yellow-50 rounded-xl p-3">
+                  <p className="text-xs font-medium text-yellow-700 mb-1">관리자 메모</p>
+                  <p className="text-sm text-yellow-800">{selectedHistory.admin_note}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -176,20 +176,28 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
             <button
               key={r.id}
               onClick={() => setSelectedReservation(r)}
-              className="card w-full text-left hover:bg-gray-50 transition-colors"
+              className="card !p-0 overflow-hidden w-full text-left hover:bg-gray-50 transition-colors"
             >
-              <div className="flex items-center justify-between mb-1">
-                <h4 className="font-bold text-sm text-gray-900">
-                  {r.vehicles?.name}
-                  <span className="text-xs text-gray-400 font-normal ml-1">
-                    {r.vehicles?.plate_number}
-                  </span>
-                </h4>
-                <StatusBadge status={r.status} />
-              </div>
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>{r.guest_name} ({r.department})</span>
-                <span>{r.start_date}</span>
+              <div className="px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm">
+                      {r.vehicles?.type === "bus" ? "🚌" : r.vehicles?.type === "van" ? "🚐" : "🚗"}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-sm text-gray-900 truncate">{r.vehicles?.name}</span>
+                        <StatusBadge status={r.status} />
+                      </div>
+                      <p className="text-xs text-gray-400 truncate">
+                        {r.guest_name} ({r.department}) · {r.start_date}
+                      </p>
+                    </div>
+                  </div>
+                  <svg className="w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
               </div>
             </button>
           ))}
