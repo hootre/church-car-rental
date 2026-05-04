@@ -272,6 +272,7 @@ export default function VehicleManagement() {
   const [loading, setLoading] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>("info");
+  const [filterType, setFilterType] = useState("all");
 
   // 현재 사용중인 차량 ID 목록
   const [inUseVehicleIds, setInUseVehicleIds] = useState<Set<string>>(new Set());
@@ -606,9 +607,26 @@ export default function VehicleManagement() {
     { available: 0, in_use: 0, unavailable: 0 } as Record<VehicleStatus, number>
   );
 
-  // 카테고리별 분류
-  const sharedVehicles = vehicles.filter((v) => (v.category || "shared") === "shared");
-  const personalVehicles = vehicles.filter((v) => v.category === "personal");
+  // 필터 + 정렬 (다인승 순)
+  const sortByCapacity = (a: Vehicle, b: Vehicle) => (b.capacity || 0) - (a.capacity || 0);
+  const typeFilter = (v: Vehicle) => filterType === "all" || v.type === filterType;
+
+  const sharedVehicles = vehicles
+    .filter((v) => (v.category || "shared") === "shared")
+    .filter(typeFilter)
+    .sort(sortByCapacity);
+  const personalVehicles = vehicles
+    .filter((v) => v.category === "personal")
+    .filter(typeFilter)
+    .sort(sortByCapacity);
+
+  const typeFilters: { key: string; label: string }[] = [
+    { key: "all", label: "전체" },
+    { key: "bus", label: "버스" },
+    { key: "van", label: "승합차" },
+    { key: "sedan", label: "승용차" },
+    { key: "truck", label: "화물차" },
+  ];
 
   // ========== 팝업 닫기 ==========
   function closeDetail() {
@@ -667,6 +685,23 @@ export default function VehicleManagement() {
           <div className="text-lg font-bold text-red-700">{statusCounts.unavailable}</div>
           <div className="text-[10px] text-red-600">사용불가</div>
         </div>
+      </div>
+
+      {/* 차종 필터 */}
+      <div className="flex gap-1.5 mb-4 overflow-x-auto scrollbar-hide">
+        {typeFilters.map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilterType(f.key)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+              filterType === f.key
+                ? "bg-primary-600 text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
       </div>
 
       {loading ? (
