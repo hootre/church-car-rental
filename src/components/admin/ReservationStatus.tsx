@@ -100,6 +100,17 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
       return;
     }
 
+    // 확인 팝업
+    const confirmMessages: Record<string, string> = {
+      staff_approved: `"${reservation.guest_name}"님의 예약을 1차 승인하시겠습니까?`,
+      approved: `"${reservation.guest_name}"님의 예약을 최종 승인하시겠습니까?\n(승인 시 신청자에게 SMS가 발송됩니다)`,
+      rejected: `"${reservation.guest_name}"님의 예약을 거절하시겠습니까?`,
+      in_use: `"${reservation.guest_name}"님의 대여를 시작하시겠습니까?`,
+      returned: `"${reservation.guest_name}"님의 반납을 완료 처리하시겠습니까?`,
+    };
+    const msg = confirmMessages[nextStatus] || `상태를 "${statusLabel[nextStatus]}"(으)로 변경하시겠습니까?`;
+    if (!confirm(msg)) return;
+
     const updateData: Record<string, unknown> = {
       status: nextStatus,
       admin_note: actionNote || reservation.admin_note,
@@ -130,6 +141,20 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
     } else {
       toast.success(`${statusLabel[nextStatus]}(으)로 변경되었습니다`);
       setActionNote("");
+      setSelectedReservation(null);
+      fetchReservations();
+    }
+  }
+
+  // 예약 삭제 (최고관리자만)
+  async function handleDelete(id: string) {
+    if (!confirm("이 예약을 완전히 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.")) return;
+
+    const { error } = await supabase.from("reservations").delete().eq("id", id);
+    if (error) {
+      toast.error("삭제에 실패했습니다");
+    } else {
+      toast.success("예약이 삭제되었습니다");
       setSelectedReservation(null);
       fetchReservations();
     }
@@ -380,6 +405,22 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
                           : "이 단계의 승인 권한이 없습니다"}
                       </p>
                     )}
+                  </div>
+                )}
+
+                {/* 최고관리자 삭제 버튼 */}
+                {adminRole === "super_admin" && (
+                  <div className="pt-3 border-t border-gray-100">
+                    <button
+                      onClick={() => handleDelete(r.id)}
+                      className="w-full py-2 text-xs text-red-500 hover:bg-red-50 rounded-xl transition-colors flex items-center justify-center gap-1"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      이 예약 삭제
+                    </button>
                   </div>
                 )}
               </div>

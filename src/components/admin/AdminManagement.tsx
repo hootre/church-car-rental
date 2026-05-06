@@ -65,6 +65,8 @@ export default function AdminManagement({ currentAdminId }: Props) {
       return;
     }
 
+    if (!confirm(`"${form.name.trim()}" 관리자를 추가하시겠습니까?`)) return;
+
     setSaving(true);
     try {
       const res = await fetch("/api/admin/admins", {

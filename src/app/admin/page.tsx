@@ -179,7 +179,7 @@ export default function AdminPage() {
           </button>
         </div>
 
-        <div className="flex gap-0.5 bg-gray-100 rounded-xl p-1 mb-4 overflow-x-auto scrollbar-hide">
+        <div className="flex gap-0.5 bg-gray-100 rounded-xl p-1 pt-3 mb-4 overflow-x-auto overflow-y-visible scrollbar-hide">
           {visibleTabs.map((tab) => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
               className={`relative flex-1 min-w-0 py-2 px-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap text-center ${
@@ -187,14 +187,14 @@ export default function AdminPage() {
               }`}>
               <span className="mr-0.5">{tab.icon}</span>{tab.label}
               {tab.key === "status" && (pendingCount > 0 || staffApprovedCount > 0) && (
-                <span className="absolute -top-1.5 -right-1 flex items-center gap-0.5">
+                <span className="absolute -top-2 right-0 flex items-center gap-0.5">
                   {pendingCount > 0 && (
-                    <span className="min-w-[18px] h-[18px] flex items-center justify-center bg-yellow-400 text-yellow-900 text-[10px] font-bold rounded-full px-1">
+                    <span className="min-w-[16px] h-[16px] flex items-center justify-center bg-yellow-400 text-yellow-900 text-[9px] font-bold rounded-full px-0.5 shadow-sm">
                       {pendingCount}
                     </span>
                   )}
                   {staffApprovedCount > 0 && (
-                    <span className="min-w-[18px] h-[18px] flex items-center justify-center bg-orange-500 text-white text-[10px] font-bold rounded-full px-1">
+                    <span className="min-w-[16px] h-[16px] flex items-center justify-center bg-orange-500 text-white text-[9px] font-bold rounded-full px-0.5 shadow-sm">
                       {staffApprovedCount}
                     </span>
                   )}
@@ -208,7 +208,7 @@ export default function AdminPage() {
         {activeTab === "status" && adminSession && (
           <ReservationStatus adminId={adminSession.id} adminRole={adminSession.role} />
         )}
-        {activeTab === "history" && <ReservationHistory />}
+        {activeTab === "history" && <ReservationHistory adminRole={adminSession?.role} />}
         {activeTab === "vehicles" && <VehicleManagement />}
         {activeTab === "admins" && adminSession?.role === "super_admin" && (
           <>

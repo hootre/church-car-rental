@@ -43,40 +43,67 @@ function getAuthHeader(): string {
  * 오늘 발송 건수 조회
  */
 async function getTodaySentCount(): Promise<number> {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  const { count } = await supabase
-    .from("sms_logs")
-    .select("*", { count: "exact", head: true })
-    .gte("sent_at", today.toISOString());
+    const { count, error } = await supabase
+      .from("sms_logs")
+      .select("*", { count: "exact", head: true })
+      .gte("sent_at", today.toISOString());
 
-  return count || 0;
+    if (error) {
+      console.warn("[SMS] sms_logs 조회 실패 (테이블 미생성?):", error.message);
+      return 0;
+    }
+
+    return count || 0;
+  } catch (e) {
+    console.warn("[SMS] getTodaySentCount 에러:", e);
+    return 0;
+  }
 }
 
 /**
  * SMS 설정 조회 (무료/유료 모드)
  */
 async function getSmsSettings(): Promise<{ mode: "free" | "paid"; daily_limit: number }> {
-  const { data } = await supabase
-    .from("sms_settings")
-    .select("mode, daily_limit")
-    .eq("id", "default")
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from("sms_settings")
+      .select("mode, daily_limit")
+      .eq("id", "default")
+      .single();
 
-  return data || { mode: "free", daily_limit: 50 };
+    if (error) {
+      console.warn("[SMS] sms_settings 조회 실패 (테이블 미생성?):", error.message);
+      return { mode: "free", daily_limit: 50 };
+    }
+
+    return data || { mode: "free", daily_limit: 50 };
+  } catch (e) {
+    console.warn("[SMS] getSmsSettings 에러:", e);
+    return { mode: "free", daily_limit: 50 };
+  }
 }
 
 /**
  * 발송 로그 기록
  */
 async function logSmsSent(messages: SmsMessage[]) {
-  const logs = messages.map((msg) => ({
-    recipient: msg.to,
-    message: msg.text,
-  }));
+  try {
+    const logs = messages.map((msg) => ({
+      recipient: msg.to,
+      message: msg.text,
+    }));
 
-  await supabase.from("sms_logs").insert(logs);
+    const { error } = await supabase.from("sms_logs").insert(logs);
+    if (error) {
+      console.warn("[SMS] 로그 기록 실패 (테이블 미생성?):", error.message);
+    }
+  } catch (e) {
+    console.warn("[SMS] logSmsSent 에러:", e);
+  }
 }
 
 export async function sendSms(messages: SmsMessage[]): Promise<SmsResult> {
