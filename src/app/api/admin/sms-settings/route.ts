@@ -27,17 +27,15 @@ export async function GET() {
     mode: settings?.mode || "free",
     daily_limit: settings?.daily_limit || 50,
     today_sent: count || 0,
+    message_template: settings?.message_template || "[차량부] 예약 승인 완료\\n차량: {vehicle}\\n기간: {start}~{end}\\n안전 운행하세요!",
   });
 }
 
-// SMS 모드 변경 (최고관리자만)
+// SMS 설정 변경 (최고관리자만)
 export async function PATCH(request: NextRequest) {
   try {
-    const { mode, admin_id } = await request.json();
-
-    if (!mode || !["free", "paid"].includes(mode)) {
-      return NextResponse.json({ error: "올바른 모드를 선택해 주세요" }, { status: 400 });
-    }
+    const body = await request.json();
+    const { admin_id, mode, message_template } = body;
 
     // 최고관리자 확인
     if (admin_id) {
@@ -52,20 +50,29 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    const updateData: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+      updated_by: admin_id || null,
+    };
+
+    if (mode && ["free", "paid"].includes(mode)) {
+      updateData.mode = mode;
+    }
+
+    if (typeof message_template === "string") {
+      updateData.message_template = message_template;
+    }
+
     const { error } = await supabase
       .from("sms_settings")
-      .update({
-        mode,
-        updated_at: new Date().toISOString(),
-        updated_by: admin_id || null,
-      })
+      .update(updateData)
       .eq("id", "default");
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, mode });
+    return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "서버 오류" }, { status: 500 });
   }

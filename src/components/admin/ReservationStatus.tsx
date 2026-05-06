@@ -111,38 +111,29 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
     const msg = confirmMessages[nextStatus] || `상태를 "${statusLabel[nextStatus]}"(으)로 변경하시겠습니까?`;
     if (!confirm(msg)) return;
 
-    const updateData: Record<string, unknown> = {
-      status: nextStatus,
-      admin_note: actionNote || reservation.admin_note,
-    };
+    try {
+      const res = await fetch("/api/reservations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: reservation.id,
+          status: nextStatus,
+          admin_note: actionNote || reservation.admin_note,
+          admin_id: adminId,
+        }),
+      });
 
-    if (nextStatus === "staff_approved") {
-      updateData.staff_approved_by = adminId;
-      updateData.staff_approved_at = new Date().toISOString();
-    }
-    if (nextStatus === "approved") {
-      updateData.manager_approved_by = adminId;
-      updateData.manager_approved_at = new Date().toISOString();
-    }
-    if (nextStatus === "in_use") {
-      updateData.picked_up_at = new Date().toISOString();
-    }
-    if (nextStatus === "returned") {
-      updateData.returned_at = new Date().toISOString();
-    }
-
-    const { error } = await supabase
-      .from("reservations")
-      .update(updateData)
-      .eq("id", reservation.id);
-
-    if (error) {
-      toast.error("상태 변경에 실패했습니다");
-    } else {
-      toast.success(`${statusLabel[nextStatus]}(으)로 변경되었습니다`);
-      setActionNote("");
-      setSelectedReservation(null);
-      fetchReservations();
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || "상태 변경에 실패했습니다");
+      } else {
+        toast.success(`${statusLabel[nextStatus]}(으)로 변경되었습니다`);
+        setActionNote("");
+        setSelectedReservation(null);
+        fetchReservations();
+      }
+    } catch {
+      toast.error("서버 오류가 발생했습니다");
     }
   }
 
