@@ -1,0 +1,7 @@
+# 한국중앙교회 차량부 - robots.txt
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://church-car-rental.vercel.app/sitemap.xml
