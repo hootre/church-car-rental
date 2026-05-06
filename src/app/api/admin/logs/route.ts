@@ -11,15 +11,23 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const limit = parseInt(searchParams.get("limit") || "100");
 
-  const { data, error } = await supabase
-    .from("admin_logs")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  try {
+    const { data, error } = await supabase
+      .from("admin_logs")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      // 테이블 미생성 시
+      if (error.message.includes("does not exist") || error.code === "42P01") {
+        return NextResponse.json({ error: "admin_logs 테이블이 없습니다. schema_v10_admin_logs.sql을 실행해 주세요." }, { status: 404 });
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data || []);
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
   }
-
-  return NextResponse.json(data || []);
 }

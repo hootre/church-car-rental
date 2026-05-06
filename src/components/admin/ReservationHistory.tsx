@@ -304,7 +304,7 @@ ${hasPhotos ? `<div class="section"><div class="section-title">차량 사진</di
   return (
     <div>
       {/* 검색 + 필터 토글 */}
-      <div className="card mb-3 space-y-3">
+      <div className="card mb-3 space-y-3 overflow-visible">
         <div className="flex gap-2">
           <div className="relative flex-1">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -338,7 +338,7 @@ ${hasPhotos ? `<div class="section"><div class="section-title">차량 사진</di
         </div>
 
         {/* 상태 필터 칩 */}
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide py-1 px-0.5">
           {statusChips.map((chip) => (
             <button
               key={chip.key}

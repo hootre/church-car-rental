@@ -40,6 +40,7 @@ const ACTION_COLORS: Record<string, string> = {
 export default function AdminLogs() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLogs();
@@ -50,10 +51,12 @@ export default function AdminLogs() {
       const res = await fetch("/api/admin/logs?limit=50");
       const data = await res.json();
       if (res.ok) {
-        setLogs(data);
+        setLogs(Array.isArray(data) ? data : []);
+      } else {
+        setError(data.error || "로그 조회 실패");
       }
-    } catch {
-      // ignore
+    } catch (e) {
+      setError("서버 연결 실패");
     }
     setLoading(false);
   }
@@ -116,7 +119,12 @@ export default function AdminLogs() {
         </div>
       </div>
 
-      {logs.length === 0 ? (
+      {error ? (
+        <div className="text-xs text-red-500 text-center py-4">
+          <p>⚠️ {error}</p>
+          <p className="text-[10px] text-gray-400 mt-1">Supabase에서 admin_logs 테이블을 생성해 주세요</p>
+        </div>
+      ) : logs.length === 0 ? (
         <p className="text-xs text-gray-400 text-center py-4">기록된 활동이 없습니다</p>
       ) : (
         <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
