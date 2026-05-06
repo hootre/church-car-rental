@@ -28,13 +28,21 @@ export default function AdminPage() {
   const [authLoading, setAuthLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("calendar");
   const [pendingCount, setPendingCount] = useState(0);
+  const [staffApprovedCount, setStaffApprovedCount] = useState(0);
 
   const fetchPendingCount = useCallback(async () => {
-    const { count } = await supabase
+    const { count: pending } = await supabase
       .from("reservations")
       .select("*", { count: "exact", head: true })
-      .in("status", ["pending", "staff_approved"]);
-    setPendingCount(count || 0);
+      .eq("status", "pending");
+
+    const { count: staffApproved } = await supabase
+      .from("reservations")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "staff_approved");
+
+    setPendingCount(pending || 0);
+    setStaffApprovedCount(staffApproved || 0);
   }, []);
 
   useEffect(() => {
@@ -178,9 +186,18 @@ export default function AdminPage() {
                 activeTab === tab.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
               }`}>
               <span className="mr-0.5">{tab.icon}</span>{tab.label}
-              {tab.key === "status" && pendingCount > 0 && (
-                <span className="absolute -top-1 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1">
-                  {pendingCount}
+              {tab.key === "status" && (pendingCount > 0 || staffApprovedCount > 0) && (
+                <span className="absolute -top-1.5 -right-1 flex items-center gap-0.5">
+                  {pendingCount > 0 && (
+                    <span className="min-w-[18px] h-[18px] flex items-center justify-center bg-yellow-400 text-yellow-900 text-[10px] font-bold rounded-full px-1">
+                      {pendingCount}
+                    </span>
+                  )}
+                  {staffApprovedCount > 0 && (
+                    <span className="min-w-[18px] h-[18px] flex items-center justify-center bg-orange-500 text-white text-[10px] font-bold rounded-full px-1">
+                      {staffApprovedCount}
+                    </span>
+                  )}
                 </span>
               )}
             </button>

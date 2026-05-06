@@ -157,8 +157,8 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
     <div>
       {/* 통계 카드 (필터 겸용) */}
       <div className="grid grid-cols-3 gap-1.5 mb-3">
-        <StatCard label="담당장로" count={stats.pending} bg="bg-yellow-50" color="text-yellow-700" subColor="text-yellow-600" active={filter === "pending"} onClick={() => setFilter(filter === "pending" ? "all" : "pending")} />
-        <StatCard label="기획장로" count={stats.staff_approved} bg="bg-emerald-50" color="text-emerald-700" subColor="text-emerald-600" active={filter === "staff_approved"} onClick={() => setFilter(filter === "staff_approved" ? "all" : "staff_approved")} />
+        <StatCard label="1차 대기" count={stats.pending} bg="bg-yellow-50" color="text-yellow-700" subColor="text-yellow-600" active={filter === "pending"} onClick={() => setFilter(filter === "pending" ? "all" : "pending")} />
+        <StatCard label="2차 대기" count={stats.staff_approved} bg="bg-orange-50" color="text-orange-700" subColor="text-orange-600" active={filter === "staff_approved"} onClick={() => setFilter(filter === "staff_approved" ? "all" : "staff_approved")} />
         <StatCard label="승인완료" count={stats.approved} bg="bg-green-50" color="text-green-700" subColor="text-green-600" active={filter === "approved"} onClick={() => setFilter(filter === "approved" ? "all" : "approved")} />
         <StatCard label="대여중" count={stats.in_use} bg="bg-blue-50" color="text-blue-700" subColor="text-blue-600" active={filter === "in_use"} onClick={() => setFilter(filter === "in_use" ? "all" : "in_use")} />
         <StatCard label="반납완료" count={stats.returned} bg="bg-purple-50" color="text-purple-700" subColor="text-purple-600" active={filter === "returned"} onClick={() => setFilter(filter === "returned" ? "all" : "returned")} />
@@ -273,7 +273,7 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
                         <div className={`text-xs font-bold ${r.staff_approved_at ? "text-emerald-600" : "text-gray-300"}`}>
                           {r.staff_approved_at ? "✓ 승인" : "⏳ 대기"}
                         </div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">차량담당 장로</div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">1차 승인</div>
                         {r.staff_approved_at && (
                           <>
                             {getAdminName(r.staff_approved_by) && (
@@ -292,7 +292,7 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
                         <div className={`text-xs font-bold ${r.manager_approved_at ? "text-green-600" : "text-gray-300"}`}>
                           {r.manager_approved_at ? "✓ 승인" : "⏳ 대기"}
                         </div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">기획장로</div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">2차 승인</div>
                         {r.manager_approved_at && (
                           <>
                             {getAdminName(r.manager_approved_by) && (
