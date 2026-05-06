@@ -6,9 +6,11 @@ import { Admin, roleLabel } from "@/lib/supabase";
 
 interface Props {
   currentAdminId: string;
+  currentAdminRole: string;
+  currentAdminName: string;
 }
 
-export default function AdminManagement({ currentAdminId }: Props) {
+export default function AdminManagement({ currentAdminId, currentAdminRole, currentAdminName }: Props) {
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -78,6 +80,8 @@ export default function AdminManagement({ currentAdminId }: Props) {
           name: form.name.trim(),
           phone: form.phone.trim() || null,
           role: form.role,
+          requester_id: currentAdminId,
+          requester_name: currentAdminName,
         }),
       });
       const data = await res.json();
@@ -115,7 +119,7 @@ export default function AdminManagement({ currentAdminId }: Props) {
       const res = await fetch("/api/admin/admins", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: adminId, password: newPassword }),
+        body: JSON.stringify({ id: adminId, password: newPassword, requester_id: currentAdminId, requester_name: currentAdminName }),
       });
 
       if (res.ok) {
@@ -144,7 +148,12 @@ export default function AdminManagement({ currentAdminId }: Props) {
       const res = await fetch("/api/admin/admins", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: admin.id }),
+        body: JSON.stringify({
+          id: admin.id,
+          requester_id: currentAdminId,
+          requester_name: currentAdminName,
+          requester_role: currentAdminRole,
+        }),
       });
 
       if (res.ok) {
@@ -170,7 +179,7 @@ export default function AdminManagement({ currentAdminId }: Props) {
       const res = await fetch("/api/admin/admins", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: admin.id, is_active: !admin.is_active }),
+        body: JSON.stringify({ id: admin.id, is_active: !admin.is_active, requester_id: currentAdminId, requester_name: currentAdminName }),
       });
 
       if (res.ok) {

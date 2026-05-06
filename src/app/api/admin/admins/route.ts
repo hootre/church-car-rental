@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
+import { writeAdminLog } from "@/lib/admin-log";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,7 +25,7 @@ export async function GET() {
 // 관리자 추가
 export async function POST(request: NextRequest) {
   try {
-    const { login_id, password, name, phone, role } = await request.json();
+    const { login_id, password, name, phone, role, requester_id, requester_name } = await request.json();
 
     if (!login_id || !password || !name) {
       return NextResponse.json(
@@ -66,38 +67,54 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // 로그 기록
+    if (requester_id) {
+      writeAdminLog({
+        admin_id: requester_id,
+        admin_name: requester_name || "관리자",
+        action: "admin_add",
+        target_type: "admin",
+        target_id: data.id,
+        details: { added_name: name, added_login_id: login_id, added_role: role },
+      });
+    }
+
     return NextResponse.json(data, { status: 201 });
   } catch (err) {
     console.error("Create admin error:", err);
     return NextResponse.json(
-      { error: "서버 오류가 발생했습니다" },
+      { error: "서버 오류�� 발생했습니다" },
       { status: 500 }
     );
   }
 }
 
-// 관리자 수정 (비밀번호 변경, 활성화 토글)
+// 관리자 수정 (비밀��호 변경, 활성화 토글)
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, password, is_active, phone } = body;
+    const { id, password, is_active, phone, requester_id, requester_name } = body;
 
     if (!id) {
       return NextResponse.json({ error: "ID가 필요합니다" }, { status: 400 });
     }
 
     const updates: Record<string, unknown> = {};
+    const logDetails: Record<string, unknown> = {};
 
     if (password) {
       updates.password_hash = await bcrypt.hash(password, 10);
+      logDetails.changed = "password";
     }
 
     if (typeof is_active === "boolean") {
       updates.is_active = is_active;
+      logDetails.is_active = is_active;
     }
 
     if (typeof phone === "string") {
       updates.phone = phone || null;
+      logDetails.phone = phone;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -113,6 +130,18 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // 로그 기록
+    if (requester_id) {
+      writeAdminLog({
+        admin_id: requester_id,
+        admin_name: requester_name || "관리자",
+        action: "admin_edit",
+        target_type: "admin",
+        target_id: id,
+        details: logDetails,
+      });
+    }
+
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Update admin error:", err);
@@ -123,19 +152,47 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// 관리자 삭제
+// 관리자 삭제 (최고관리자만)
 export async function DELETE(request: NextRequest) {
   try {
-    const { id } = await request.json();
+    const { id, requester_id, requester_name, requester_role } = await request.json();
 
     if (!id) {
       return NextResponse.json({ error: "ID가 필요합니다" }, { status: 400 });
     }
 
+    // 최고관리자 권한 체크
+    if (requester_role !== "super_admin") {
+      return NextResponse.json({ error: "최고관리자만 삭제할 수 있습니다" }, { status: 403 });
+    }
+
+    // 삭제 대상 정보 먼저 조회 (로그용)
+    const { data: targetAdmin } = await supabase
+      .from("admins")
+      .select("name, login_id, role")
+      .eq("id", id)
+      .single();
+
     const { error } = await supabase.from("admins").delete().eq("id", id);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // 로그 기록
+    if (requester_id) {
+      writeAdminLog({
+        admin_id: requester_id,
+        admin_name: requester_name || "관리자",
+        action: "admin_delete",
+        target_type: "admin",
+        target_id: id,
+        details: {
+          deleted_name: targetAdmin?.name,
+          deleted_login_id: targetAdmin?.login_id,
+          deleted_role: targetAdmin?.role,
+        },
+      });
     }
 
     return NextResponse.json({ success: true });

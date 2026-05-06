@@ -11,11 +11,12 @@ import {
 
 interface Props {
   adminRole?: string;
+  adminId?: string;
 }
 
 type SortKey = "newest" | "oldest" | "name" | "status";
 
-export default function ReservationHistory({ adminRole }: Props) {
+export default function ReservationHistory({ adminRole, adminId }: Props) {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
@@ -174,31 +175,59 @@ export default function ReservationHistory({ adminRole }: Props) {
     });
   }
 
-  // 단건 삭제
+  // 단건 삭제 (최고관리자만 - API 경유)
   async function handleDelete(id: string) {
+    if (adminRole !== "super_admin") {
+      toast.error("최고관리자만 삭제할 수 있습니다");
+      return;
+    }
     if (!confirm("이 예약을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.")) return;
-    const { error } = await supabase.from("reservations").delete().eq("id", id);
-    if (error) {
-      toast.error("삭제에 실패했습니다");
-    } else {
-      toast.success("삭제되었습니다");
-      if (modalReservation?.id === id) setModalReservation(null);
-      fetchReservations();
+    try {
+      const res = await fetch("/api/reservations", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, admin_id: adminId, admin_role: adminRole }),
+      });
+      if (res.ok) {
+        toast.success("삭제되었습니다");
+        if (modalReservation?.id === id) setModalReservation(null);
+        fetchReservations();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "삭제에 실패했습니다");
+      }
+    } catch {
+      toast.error("서버 오류");
     }
   }
 
-  // 일괄 삭제
+  // 일괄 삭제 (최고관리자만 - API 경유)
   async function handleBulkDelete() {
+    if (adminRole !== "super_admin") {
+      toast.error("최고관리자만 삭제할 수 있습니다");
+      return;
+    }
     const count = selectedIds.size;
     if (!confirm(`선택한 ${count}건의 예약을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.`)) return;
 
     const ids = Array.from(selectedIds);
-    const { error } = await supabase.from("reservations").delete().in("id", ids);
-    if (error) {
-      toast.error("삭제에 실패했습니다");
-    } else {
-      toast.success(`${count}건 삭제되었습니다`);
+    let successCount = 0;
+    for (const id of ids) {
+      try {
+        const res = await fetch("/api/reservations", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, admin_id: adminId, admin_role: adminRole }),
+        });
+        if (res.ok) successCount++;
+      } catch { /* continue */ }
+    }
+
+    if (successCount > 0) {
+      toast.success(`${successCount}건 삭제되었습니다`);
       fetchReservations();
+    } else {
+      toast.error("삭제에 실패했습니다");
     }
   }
 

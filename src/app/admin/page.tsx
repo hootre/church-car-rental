@@ -9,6 +9,7 @@ import VehicleManagement from "@/components/admin/VehicleManagement";
 import AdminManagement from "@/components/admin/AdminManagement";
 import CalendarView from "@/components/admin/CalendarView";
 import SmsSettings from "@/components/admin/SmsSettings";
+import AdminLogs from "@/components/admin/AdminLogs";
 import { roleLabel, supabase } from "@/lib/supabase";
 
 type Tab = "calendar" | "status" | "history" | "vehicles" | "admins";
@@ -204,12 +205,13 @@ export default function AdminPage() {
         {activeTab === "status" && adminSession && (
           <ReservationStatus adminId={adminSession.id} adminRole={adminSession.role} />
         )}
-        {activeTab === "history" && <ReservationHistory adminRole={adminSession?.role} />}
+        {activeTab === "history" && <ReservationHistory adminRole={adminSession?.role} adminId={adminSession?.id} />}
         {activeTab === "vehicles" && <VehicleManagement />}
         {activeTab === "admins" && adminSession?.role === "super_admin" && (
           <>
             <SmsSettings adminId={adminSession.id} />
-            <AdminManagement currentAdminId={adminSession.id} />
+            <AdminManagement currentAdminId={adminSession.id} currentAdminRole={adminSession.role} currentAdminName={adminSession.name} />
+            <AdminLogs />
           </>
         )}
       </main>

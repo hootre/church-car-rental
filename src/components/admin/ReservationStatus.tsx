@@ -177,17 +177,36 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
     }
   }
 
-  // 예약 삭제 (최고관리자만)
+  // 예약 삭제 (최고관리자만 - API 경유)
   async function handleDelete(id: string) {
+    if (adminRole !== "super_admin") {
+      toast.error("최고관리자만 삭제할 수 있습니다");
+      return;
+    }
     if (!confirm("이 예약을 완전히 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.")) return;
 
-    const { error } = await supabase.from("reservations").delete().eq("id", id);
-    if (error) {
-      toast.error("삭제에 실패했습니다");
-    } else {
-      toast.success("예약이 삭제되었습니다");
-      setSelectedReservation(null);
-      fetchReservations();
+    try {
+      const res = await fetch("/api/reservations", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          admin_id: adminId,
+          admin_name: "", // 서버에서 조회
+          admin_role: adminRole,
+        }),
+      });
+
+      if (res.ok) {
+        toast.success("예약이 삭제되었습니다");
+        setSelectedReservation(null);
+        fetchReservations();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "삭제에 실패했습니다");
+      }
+    } catch {
+      toast.error("서버 오류");
     }
   }
 

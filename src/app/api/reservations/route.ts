@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { notifyUserApproved } from "@/lib/notifications";
+import { writeAdminLog } from "@/lib/admin-log";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -172,11 +173,100 @@ export async function PATCH(request: NextRequest) {
       }).catch((err) => console.error("[SMS] 사용자 알림 실패:", err));
     }
 
+    // 상태 변경 로그
+    if (admin_id && data) {
+      // admin 이름 조회
+      const { data: adminData } = await supabase
+        .from("admins")
+        .select("name")
+        .eq("id", admin_id)
+        .single();
+
+      writeAdminLog({
+        admin_id,
+        admin_name: adminData?.name || "관리자",
+        action: "reservation_status_change",
+        target_type: "reservation",
+        target_id: id,
+        details: {
+          new_status: status,
+          guest_name: data.guest_name,
+          vehicle_name: data.vehicles?.name,
+        },
+      });
+    }
+
     return NextResponse.json(data);
   } catch {
     return NextResponse.json(
       { error: "업데이트에 실패했습니다" },
       { status: 500 }
     );
+  }
+}
+
+// 예약 삭제 (최고관리자만)
+export async function DELETE(request: NextRequest) {
+  try {
+    const { id, admin_id, admin_role } = await request.json();
+
+    if (!id) {
+      return NextResponse.json({ error: "ID가 필요합니다" }, { status: 400 });
+    }
+
+    // 최고관리자 권한 체크
+    if (admin_role !== "super_admin") {
+      return NextResponse.json({ error: "최고관리자만 삭제할 수 있습니다" }, { status: 403 });
+    }
+
+    // 삭제 대상 정보 조회 (로그용)
+    const { data: target } = await supabase
+      .from("reservations")
+      .select("guest_name, department, start_date, end_date, vehicles(name)")
+      .eq("id", id)
+      .single();
+
+    // 관리자 이름 조회
+    let adminName = "관리자";
+    if (admin_id) {
+      const { data: adminData } = await supabase
+        .from("admins")
+        .select("name")
+        .eq("id", admin_id)
+        .single();
+      if (adminData) adminName = adminData.name;
+    }
+
+    const { error } = await supabase.from("reservations").delete().eq("id", id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // 로그 기록
+    if (admin_id) {
+      const vehicleName = target?.vehicles
+        ? (target.vehicles as { name?: string })?.name
+        : undefined;
+
+      writeAdminLog({
+        admin_id,
+        admin_name: adminName,
+        action: "reservation_delete",
+        target_type: "reservation",
+        target_id: id,
+        details: {
+          guest_name: target?.guest_name,
+          department: target?.department,
+          vehicle_name: vehicleName,
+          start_date: target?.start_date,
+          end_date: target?.end_date,
+        },
+      });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "삭제에 실패했습니다" }, { status: 500 });
   }
 }
