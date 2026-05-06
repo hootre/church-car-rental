@@ -13,6 +13,8 @@ interface Props {
   adminRole?: string;
 }
 
+type SortKey = "newest" | "oldest" | "name" | "status";
+
 export default function ReservationHistory({ adminRole }: Props) {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -22,13 +24,17 @@ export default function ReservationHistory({ adminRole }: Props) {
   // 상세 팝업
   const [modalReservation, setModalReservation] = useState<Reservation | null>(null);
 
-  // 필터 상태
+  // 필터
   const [searchName, setSearchName] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterVehicle, setFilterVehicle] = useState("all");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("newest");
+
+  // 선택
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // 차량 + 관리자 목록
   useEffect(() => {
@@ -43,22 +49,15 @@ export default function ReservationHistory({ adminRole }: Props) {
     fetchMeta();
   }, []);
 
-  // 관리자 이름 찾기
   function getAdminName(adminId: string | null): string {
     if (!adminId) return "-";
     const admin = admins.find((a) => a.id === adminId);
     return admin ? admin.name : "-";
   }
 
-  // 예약 내역 조회
   const statusOrder: Record<string, number> = {
-    pending: 0,
-    staff_approved: 1,
-    approved: 2,
-    in_use: 3,
-    returned: 4,
-    cancelled: 5,
-    rejected: 6,
+    pending: 0, staff_approved: 1, approved: 2, in_use: 3,
+    returned: 4, cancelled: 5, rejected: 6,
   };
 
   const fetchReservations = useCallback(async () => {
@@ -89,28 +88,116 @@ export default function ReservationHistory({ adminRole }: Props) {
             r.department.toLowerCase().includes(keyword)
         );
       }
-      filtered.sort((a, b) => {
-        const diff = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
-        if (diff !== 0) return diff;
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      });
       setReservations(filtered);
     }
+    setSelectedIds(new Set());
   }, [filterStatus, filterVehicle, filterDateFrom, filterDateTo, searchName]);
 
   useEffect(() => {
     fetchReservations();
   }, [fetchReservations]);
 
-  // 예약 삭제
+  // 정렬 적용
+  const sorted = [...reservations].sort((a, b) => {
+    switch (sortKey) {
+      case "newest":
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      case "oldest":
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      case "name":
+        return a.guest_name.localeCompare(b.guest_name, "ko");
+      case "status":
+        return (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
+      default:
+        return 0;
+    }
+  });
+
+  // 오늘 날짜
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // 오늘 해당 항목
+  const todayItems = sorted.filter((r) => r.start_date <= todayStr && r.end_date >= todayStr);
+  const todayIds = new Set(todayItems.map((r) => r.id));
+
+  // 나머지 항목
+  const restItems = sorted.filter((r) => !todayIds.has(r.id));
+
+  // 월별 그룹핑
+  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set());
+
+  function groupByMonth(items: Reservation[]): { key: string; label: string; items: Reservation[] }[] {
+    const groups: Record<string, Reservation[]> = {};
+    for (const r of items) {
+      const date = new Date(r.start_date || r.created_at);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(r);
+    }
+    return Object.entries(groups)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([key, items]) => {
+        const [year, month] = key.split("-");
+        return { key, label: `${year}년 ${parseInt(month)}월`, items };
+      });
+  }
+
+  const monthlyGroups = groupByMonth(restItems);
+
+  function toggleMonth(monthKey: string) {
+    setCollapsedMonths((prev) => {
+      const next = new Set(prev);
+      if (next.has(monthKey)) next.delete(monthKey);
+      else next.add(monthKey);
+      return next;
+    });
+  }
+
+  // 선택 관련
+  const allSelected = sorted.length > 0 && selectedIds.size === sorted.length;
+  const someSelected = selectedIds.size > 0;
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(sorted.map((r) => r.id)));
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // 단건 삭제
   async function handleDelete(id: string) {
-    if (!confirm("이 예약을 삭제하시겠습니까?")) return;
+    if (!confirm("이 예약을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.")) return;
     const { error } = await supabase.from("reservations").delete().eq("id", id);
     if (error) {
       toast.error("삭제에 실패했습니다");
     } else {
       toast.success("삭제되었습니다");
       if (modalReservation?.id === id) setModalReservation(null);
+      fetchReservations();
+    }
+  }
+
+  // 일괄 삭제
+  async function handleBulkDelete() {
+    const count = selectedIds.size;
+    if (!confirm(`선택한 ${count}건의 예약을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.`)) return;
+
+    const ids = Array.from(selectedIds);
+    const { error } = await supabase.from("reservations").delete().in("id", ids);
+    if (error) {
+      toast.error("삭제에 실패했습니다");
+    } else {
+      toast.success(`${count}건 삭제되었습니다`);
       fetchReservations();
     }
   }
@@ -123,6 +210,26 @@ export default function ReservationHistory({ adminRole }: Props) {
     setFilterDateFrom("");
     setFilterDateTo("");
   }
+
+  // 활성 필터 수
+  const activeFilterCount = [
+    filterStatus !== "all",
+    filterVehicle !== "all",
+    !!filterDateFrom,
+    !!filterDateTo,
+  ].filter(Boolean).length;
+
+  // 상태 필터 칩
+  const statusChips: { key: string; label: string; color: string }[] = [
+    { key: "all", label: "전체", color: "bg-gray-100 text-gray-700" },
+    { key: "pending", label: "1차 대기", color: "bg-yellow-100 text-yellow-700" },
+    { key: "staff_approved", label: "2차 대기", color: "bg-orange-100 text-orange-700" },
+    { key: "approved", label: "승인완료", color: "bg-green-100 text-green-700" },
+    { key: "in_use", label: "대여중", color: "bg-blue-100 text-blue-700" },
+    { key: "returned", label: "반납완료", color: "bg-purple-100 text-purple-700" },
+    { key: "cancelled", label: "취소", color: "bg-gray-200 text-gray-600" },
+    { key: "rejected", label: "거절", color: "bg-red-100 text-red-700" },
+  ];
 
   // ===== 문서 출력 =====
   function handlePrint(r: Reservation) {
@@ -144,178 +251,19 @@ export default function ReservationHistory({ adminRole }: Props) {
       return `<div style="flex:1;min-width:0;"><span style="font-size:10px;font-weight:600;color:#555;">${label}</span><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:2px;">${imgs}</div></div>`;
     }
 
-    const printHtml = `
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8">
-<title>차량 예약 확인서 - ${r.guest_name}</title>
-<style>
-  @page { size: A4; margin: 15mm 18mm; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { height: 100%; }
-  body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; color: #222; line-height: 1.35; font-size: 11px; }
-  .page { width: 100%; max-height: 257mm; overflow: hidden; display: flex; flex-direction: column; }
-  .header { text-align: center; border-bottom: 2px double #333; padding-bottom: 8px; margin-bottom: 10px; }
-  .header h1 { font-size: 18px; font-weight: 700; letter-spacing: 6px; }
-  .header-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
-  .header .org { font-size: 11px; color: #666; }
-  .print-date { font-size: 10px; color: #999; }
-  .content { flex: 1; }
-  .row2 { display: flex; gap: 8px; margin-bottom: 6px; }
-  .row2 > div { flex: 1; }
-  .section { margin-bottom: 6px; }
-  .section-title { font-size: 10px; font-weight: 700; color: #333; background: #f0f0f0; padding: 3px 8px; margin-bottom: 4px; border-left: 2px solid #333; }
-  table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  th, td { border: 1px solid #ccc; padding: 3px 7px; text-align: left; }
-  th { background: #fafafa; font-weight: 600; width: 70px; color: #555; white-space: nowrap; }
-  td { color: #222; }
-  .approval-box { display: flex; gap: 8px; margin-bottom: 6px; }
-  .approval-card { flex: 1; border: 1px solid #ccc; text-align: center; padding: 8px 4px; }
-  .approval-card .title { font-size: 10px; color: #666; font-weight: 600; margin-bottom: 4px; border-bottom: 1px solid #eee; padding-bottom: 3px; }
-  .approval-card .stamp { font-size: 16px; font-weight: 700; color: #1a7f37; }
-  .approval-card .name { font-size: 10px; color: #444; margin-top: 2px; }
-  .approval-card .date { font-size: 9px; color: #999; }
-  .approval-card .pending { font-size: 11px; color: #bbb; padding: 6px 0; }
-  .status-badge { display: inline-block; padding: 1px 8px; border-radius: 8px; font-size: 10px; font-weight: 600; }
-  .status-approved { background: #dcfce7; color: #166534; }
-  .status-pending { background: #fef9c3; color: #854d0e; }
-  .status-rejected { background: #fecaca; color: #991b1b; }
-  .status-in_use { background: #dbeafe; color: #1e40af; }
-  .status-returned { background: #ede9fe; color: #5b21b6; }
-  .status-staff_approved { background: #d1fae5; color: #065f46; }
-  .memo-box { border: 1px solid #ccc; padding: 4px 7px; font-size: 11px; color: #333; min-height: 20px; }
-  .footer { text-align: center; font-size: 9px; color: #aaa; border-top: 1px solid #ddd; padding-top: 6px; margin-top: auto; }
-  @media print {
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .no-print { display: none !important; }
-    .page { height: 257mm; }
-  }
-  @media screen {
-    .page { max-width: 210mm; margin: 0 auto; padding: 15mm 18mm; border: 1px solid #ddd; background: #fff; }
-  }
-</style>
-</head>
-<body>
-<div class="page">
-  <div class="header">
-    <h1>차량 예약 확인서</h1>
-    <div class="header-meta">
-      <span class="org">한국중앙교회 차량관리</span>
-      <span class="print-date">출력일: ${new Date().toLocaleDateString("ko-KR")} ${new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</span>
-    </div>
-  </div>
-
-  <div class="content">
-    <div style="margin-bottom:8px;">
-      <span class="status-badge status-${r.status}">${statusLabel[r.status] || r.status}</span>
-      <span style="font-size:10px;color:#999;margin-left:6px;">신청일: ${new Date(r.created_at).toLocaleString("ko-KR")}</span>
-    </div>
-
-    <div class="row2">
-      <div class="section">
-        <div class="section-title">신청자 정보</div>
-        <table>
-          <tr><th>이름</th><td>${r.guest_name}</td></tr>
-          <tr><th>부서</th><td>${r.department}</td></tr>
-          <tr><th>연락처</th><td>${r.phone}</td></tr>
-          ${r.driver_name ? `<tr><th>운전자</th><td>${r.driver_name}</td></tr>` : ""}
-        </table>
-      </div>
-      <div class="section">
-        <div class="section-title">차량 정보</div>
-        <table>
-          <tr><th>차량명</th><td>${vehicleName}</td></tr>
-          <tr><th>차량번호</th><td>${plateNumber}</td></tr>
-          <tr><th>차종</th><td>${vehicleType}</td></tr>
-        </table>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-title">사용 일정</div>
-      <table>
-        <tr>
-          <th>대여</th><td>${r.start_date} ${r.start_time?.slice(0, 5) || ""}</td>
-          <th>반납</th><td>${r.end_date} ${r.end_time?.slice(0, 5) || ""}</td>
-        </tr>
-        <tr>
-          <th>행선지</th><td>${r.destination || "-"}</td>
-          <th>탑승인원</th><td>${r.passenger_count ? r.passenger_count + "명" : "-"}</td>
-        </tr>
-        ${r.purpose ? `<tr><th>사용목적</th><td colspan="3">${r.purpose}</td></tr>` : ""}
-        ${r.picked_up_at || r.returned_at ? `
-        <tr>
-          <th>실제대여</th><td>${r.picked_up_at ? new Date(r.picked_up_at).toLocaleString("ko-KR") : "-"}</td>
-          <th>실제반납</th><td>${r.returned_at ? new Date(r.returned_at).toLocaleString("ko-KR") : "-"}</td>
-        </tr>` : ""}
-      </table>
-    </div>
-
-    ${r.admin_note ? `
-    <div class="section">
-      <div class="section-title">관리자 메모</div>
-      <div class="memo-box">${r.admin_note}</div>
-    </div>
-    ` : ""}
-
-    <div class="section">
-      <div class="section-title">승인 현황</div>
-      <div class="approval-box">
-        <div class="approval-card">
-          <div class="title">차량담당 장로 승인</div>
-          ${r.staff_approved_at
-            ? `<div class="stamp">승인</div><div class="name">${staffName}</div><div class="date">${new Date(r.staff_approved_at).toLocaleDateString("ko-KR")}</div>`
-            : `<div class="pending">미승인</div>`
-          }
-        </div>
-        <div class="approval-card">
-          <div class="title">기획장로 승인</div>
-          ${r.manager_approved_at
-            ? `<div class="stamp">승인</div><div class="name">${managerName}</div><div class="date">${new Date(r.manager_approved_at).toLocaleDateString("ko-KR")}</div>`
-            : `<div class="pending">미승인</div>`
-          }
-        </div>
-      </div>
-    </div>
-
-    ${hasPhotos ? `
-    <div class="section">
-      <div class="section-title">차량 사진</div>
-      <div style="display:flex;gap:12px;padding:4px 0;">
-        ${buildPhotoHtml(pickupPhotos, "대여 시")}
-        ${buildPhotoHtml(returnPhotos, "반납 시")}
-      </div>
-    </div>
-    ` : ""}
-
-    <div style="margin-top:8px;">
-      <table>
-        <tr>
-          <th style="width:70px;">신청인</th>
-          <td style="height:32px;"></td>
-          <th style="width:70px;">확인자</th>
-          <td style="height:32px;"></td>
-        </tr>
-      </table>
-    </div>
-  </div>
-
-  <div class="footer">
-    본 문서는 한국중앙교회 차량관리 시스템에서 자동 생성되었습니다.
-  </div>
-</div>
-
-<div class="no-print" style="text-align:center;margin-top:16px;">
-  <button onclick="window.print()" style="padding:8px 28px;background:#4f46e5;color:white;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600;">
-    인쇄하기
-  </button>
-  <button onclick="window.close()" style="padding:8px 28px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600;margin-left:8px;">
-    닫기
-  </button>
-</div>
-</body>
-</html>`;
+    const printHtml = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>차량 예약 확인서 - ${r.guest_name}</title>
+<style>@page{size:A4;margin:15mm 18mm}*{margin:0;padding:0;box-sizing:border-box}html,body{height:100%}body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;color:#222;line-height:1.35;font-size:11px}.page{width:100%;max-height:257mm;overflow:hidden;display:flex;flex-direction:column}.header{text-align:center;border-bottom:2px double #333;padding-bottom:8px;margin-bottom:10px}.header h1{font-size:18px;font-weight:700;letter-spacing:6px}.header-meta{display:flex;justify-content:space-between;align-items:center;margin-top:4px}.header .org{font-size:11px;color:#666}.print-date{font-size:10px;color:#999}.content{flex:1}.row2{display:flex;gap:8px;margin-bottom:6px}.row2>div{flex:1}.section{margin-bottom:6px}.section-title{font-size:10px;font-weight:700;color:#333;background:#f0f0f0;padding:3px 8px;margin-bottom:4px;border-left:2px solid #333}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #ccc;padding:3px 7px;text-align:left}th{background:#fafafa;font-weight:600;width:70px;color:#555;white-space:nowrap}td{color:#222}.approval-box{display:flex;gap:8px;margin-bottom:6px}.approval-card{flex:1;border:1px solid #ccc;text-align:center;padding:8px 4px}.approval-card .title{font-size:10px;color:#666;font-weight:600;margin-bottom:4px;border-bottom:1px solid #eee;padding-bottom:3px}.approval-card .stamp{font-size:16px;font-weight:700;color:#1a7f37}.approval-card .name{font-size:10px;color:#444;margin-top:2px}.approval-card .date{font-size:9px;color:#999}.approval-card .pending{font-size:11px;color:#bbb;padding:6px 0}.status-badge{display:inline-block;padding:1px 8px;border-radius:8px;font-size:10px;font-weight:600}.status-approved{background:#dcfce7;color:#166534}.status-pending{background:#fef9c3;color:#854d0e}.status-rejected{background:#fecaca;color:#991b1b}.status-in_use{background:#dbeafe;color:#1e40af}.status-returned{background:#ede9fe;color:#5b21b6}.status-staff_approved{background:#d1fae5;color:#065f46}.memo-box{border:1px solid #ccc;padding:4px 7px;font-size:11px;color:#333;min-height:20px}.footer{text-align:center;font-size:9px;color:#aaa;border-top:1px solid #ddd;padding-top:6px;margin-top:auto}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.no-print{display:none!important}.page{height:257mm}}@media screen{.page{max-width:210mm;margin:0 auto;padding:15mm 18mm;border:1px solid #ddd;background:#fff}}</style></head><body>
+<div class="page"><div class="header"><h1>차량 예약 확인서</h1><div class="header-meta"><span class="org">한국중앙교회 차량관리</span><span class="print-date">출력일: ${new Date().toLocaleDateString("ko-KR")} ${new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</span></div></div>
+<div class="content"><div style="margin-bottom:8px;"><span class="status-badge status-${r.status}">${statusLabel[r.status] || r.status}</span><span style="font-size:10px;color:#999;margin-left:6px;">신청일: ${new Date(r.created_at).toLocaleString("ko-KR")}</span></div>
+<div class="row2"><div class="section"><div class="section-title">신청자 정보</div><table><tr><th>이름</th><td>${r.guest_name}</td></tr><tr><th>부서</th><td>${r.department}</td></tr><tr><th>연락처</th><td>${r.phone}</td></tr>${r.driver_name ? `<tr><th>운전자</th><td>${r.driver_name}</td></tr>` : ""}</table></div>
+<div class="section"><div class="section-title">차량 정보</div><table><tr><th>차량명</th><td>${vehicleName}</td></tr><tr><th>차량번호</th><td>${plateNumber}</td></tr><tr><th>차종</th><td>${vehicleType}</td></tr></table></div></div>
+<div class="section"><div class="section-title">사용 일정</div><table><tr><th>대여</th><td>${r.start_date} ${r.start_time?.slice(0, 5) || ""}</td><th>반납</th><td>${r.end_date} ${r.end_time?.slice(0, 5) || ""}</td></tr><tr><th>행선지</th><td>${r.destination || "-"}</td><th>탑승인원</th><td>${r.passenger_count ? r.passenger_count + "명" : "-"}</td></tr>${r.purpose ? `<tr><th>사용목적</th><td colspan="3">${r.purpose}</td></tr>` : ""}${r.picked_up_at || r.returned_at ? `<tr><th>실제대여</th><td>${r.picked_up_at ? new Date(r.picked_up_at).toLocaleString("ko-KR") : "-"}</td><th>실제반납</th><td>${r.returned_at ? new Date(r.returned_at).toLocaleString("ko-KR") : "-"}</td></tr>` : ""}</table></div>
+${r.admin_note ? `<div class="section"><div class="section-title">관리자 메모</div><div class="memo-box">${r.admin_note}</div></div>` : ""}
+<div class="section"><div class="section-title">승인 현황</div><div class="approval-box"><div class="approval-card"><div class="title">차량담당 장로 승인</div>${r.staff_approved_at ? `<div class="stamp">승인</div><div class="name">${staffName}</div><div class="date">${new Date(r.staff_approved_at).toLocaleDateString("ko-KR")}</div>` : `<div class="pending">미승인</div>`}</div><div class="approval-card"><div class="title">기획장로 승인</div>${r.manager_approved_at ? `<div class="stamp">승인</div><div class="name">${managerName}</div><div class="date">${new Date(r.manager_approved_at).toLocaleDateString("ko-KR")}</div>` : `<div class="pending">미승인</div>`}</div></div></div>
+${hasPhotos ? `<div class="section"><div class="section-title">차량 사진</div><div style="display:flex;gap:12px;padding:4px 0;">${buildPhotoHtml(pickupPhotos, "대여 시")}${buildPhotoHtml(returnPhotos, "반납 시")}</div></div>` : ""}
+<div style="margin-top:8px;"><table><tr><th style="width:70px;">신청인</th><td style="height:32px;"></td><th style="width:70px;">확인자</th><td style="height:32px;"></td></tr></table></div></div>
+<div class="footer">본 문서는 한국중앙교회 차량관리 시스템에서 자동 생성되었습니다.</div></div>
+<div class="no-print" style="text-align:center;margin-top:16px;"><button onclick="window.print()" style="padding:8px 28px;background:#4f46e5;color:white;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600;">인쇄하기</button><button onclick="window.close()" style="padding:8px 28px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600;margin-left:8px;">닫기</button></div></body></html>`;
 
     const printWindow = window.open("", "_blank");
     if (printWindow) {
@@ -326,48 +274,61 @@ export default function ReservationHistory({ adminRole }: Props) {
 
   return (
     <div>
-      {/* 검색 및 필터 */}
-      <div className="card mb-4 space-y-3">
+      {/* 검색 + 필터 토글 */}
+      <div className="card mb-3 space-y-3">
         <div className="flex gap-2">
-          <input
-            type="text"
-            value={searchName}
-            onChange={(e) => setSearchName(e.target.value)}
-            placeholder="이름, 전화번호, 부서 검색"
-            className="input-field !py-2 text-sm flex-1"
-          />
+          <div className="relative flex-1">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+              placeholder="이름, 전화번호, 부서 검색"
+              className="input-field !py-2 !pl-9 text-sm"
+            />
+          </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`px-3 py-2 rounded-xl text-sm font-medium border transition-colors ${
-              showFilters
+            className={`relative px-3 py-2 rounded-xl text-sm font-medium border transition-colors ${
+              showFilters || activeFilterCount > 0
                 ? "bg-primary-50 border-primary-300 text-primary-700"
                 : "border-gray-300 text-gray-600 hover:bg-gray-50"
             }`}
           >
-            필터
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                {activeFilterCount}
+              </span>
+            )}
           </button>
         </div>
 
+        {/* 상태 필터 칩 */}
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
+          {statusChips.map((chip) => (
+            <button
+              key={chip.key}
+              onClick={() => setFilterStatus(chip.key)}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all ${
+                filterStatus === chip.key
+                  ? chip.color + " ring-2 ring-offset-1 ring-primary-400"
+                  : "bg-gray-50 text-gray-400 hover:bg-gray-100"
+              }`}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+
+        {/* 상세 필터 */}
         {showFilters && (
           <div className="space-y-3 pt-2 border-t border-gray-100">
             <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">상태</label>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="input-field !py-2 text-sm"
-                >
-                  <option value="all">전체</option>
-                  <option value="pending">담당장로</option>
-                  <option value="staff_approved">기획장로</option>
-                  <option value="approved">승인완료</option>
-                  <option value="in_use">대여중</option>
-                  <option value="returned">반납완료</option>
-                  <option value="cancelled">예약취소</option>
-                  <option value="rejected">거절</option>
-                </select>
-              </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">차량</label>
                 <select
@@ -381,94 +342,258 @@ export default function ReservationHistory({ adminRole }: Props) {
                   ))}
                 </select>
               </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">정렬</label>
+                <select
+                  value={sortKey}
+                  onChange={(e) => setSortKey(e.target.value as SortKey)}
+                  className="input-field !py-2 text-sm"
+                >
+                  <option value="newest">최신순</option>
+                  <option value="oldest">오래된순</option>
+                  <option value="name">이름순</option>
+                  <option value="status">상태순</option>
+                </select>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">시작일</label>
-                <input
-                  type="date"
-                  value={filterDateFrom}
+                <input type="date" value={filterDateFrom}
                   onChange={(e) => setFilterDateFrom(e.target.value)}
-                  className="input-field !py-2 text-sm"
-                />
+                  className="input-field !py-2 text-sm" />
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">종료일</label>
-                <input
-                  type="date"
-                  value={filterDateTo}
+                <input type="date" value={filterDateTo}
                   onChange={(e) => setFilterDateTo(e.target.value)}
-                  className="input-field !py-2 text-sm"
-                />
+                  className="input-field !py-2 text-sm" />
               </div>
             </div>
-            <button
-              onClick={resetFilters}
-              className="text-xs text-gray-400 hover:text-gray-600"
-            >
-              필터 초기화
-            </button>
+            {activeFilterCount > 0 && (
+              <button onClick={resetFilters} className="text-xs text-red-400 hover:text-red-600">
+                필터 초기화
+              </button>
+            )}
           </div>
         )}
       </div>
 
-      {/* 결과 수 */}
-      <p className="text-sm text-gray-500 mb-3">
-        총 <span className="font-bold text-gray-900">{reservations.length}</span>건
-      </p>
+      {/* 액션 바: 전체선택 + 건수 + 일괄 삭제 */}
+      <div className="flex items-center justify-between mb-2 px-1">
+        <div className="flex items-center gap-2">
+          {adminRole === "super_admin" && sorted.length > 0 && (
+            <button
+              onClick={toggleSelectAll}
+              className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                allSelected ? "bg-primary-500 border-primary-500" : "border-gray-300 hover:border-gray-400"
+              }`}
+            >
+              {allSelected && (
+                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+          )}
+          <p className="text-sm text-gray-500">
+            총 <span className="font-bold text-gray-900">{sorted.length}</span>건
+            {someSelected && (
+              <span className="text-primary-600 font-medium"> · {selectedIds.size}건 선택</span>
+            )}
+          </p>
+        </div>
 
-      {/* 예약 목록 */}
+        {/* 일괄 삭제 */}
+        {adminRole === "super_admin" && someSelected && (
+          <button
+            onClick={handleBulkDelete}
+            className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white text-xs font-medium rounded-lg hover:bg-red-600 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            선택 삭제 ({selectedIds.size})
+          </button>
+        )}
+      </div>
+
+      {/* 예약 목록 - 월별 아코디언 */}
       {loading ? (
         <div className="text-center py-12 text-gray-400">불러오는 중...</div>
-      ) : reservations.length === 0 ? (
+      ) : sorted.length === 0 ? (
         <div className="text-center py-12">
           <div className="text-4xl mb-3">📜</div>
           <p className="text-gray-500 text-sm">검색 결과가 없습니다</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {reservations.map((r) => (
-            <button
-              key={r.id}
-              onClick={() => setModalReservation(r)}
-              className="card !p-0 overflow-hidden w-full text-left hover:bg-gray-50 transition-colors"
-            >
-              <div className="px-4 py-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm">
-                      {r.vehicles?.type === "bus" ? "🚌" : r.vehicles?.type === "van" ? "🚐" : "🚗"}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-bold text-sm text-gray-900 truncate">{r.vehicles?.name}</span>
-                        <StatusBadge status={r.status} />
-                      </div>
-                      <p className="text-xs text-gray-400 truncate">
-                        {r.guest_name} ({r.department}) · {r.start_date}
-                      </p>
+        <div className="space-y-3">
+          {/* 오늘 섹션 */}
+          {todayItems.length > 0 && (
+            <div className="rounded-2xl overflow-hidden border-2 border-primary-200 bg-white">
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-primary-50">
+                <span className="text-sm">📌</span>
+                <span className="text-sm font-bold text-primary-700">오늘</span>
+                <span className="text-xs text-primary-500 font-medium">{todayItems.length}건</span>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {todayItems.map((r) => (
+                  <div
+                    key={r.id}
+                    className={`transition-colors ${selectedIds.has(r.id) ? "bg-primary-50/40" : ""}`}
+                  >
+                    <div className="flex items-center">
+                      {adminRole === "super_admin" && (
+                        <button
+                          onClick={() => toggleSelect(r.id)}
+                          className="pl-3 pr-1 py-3 self-stretch flex items-center"
+                        >
+                          <div className={`rounded border-2 flex items-center justify-center transition-colors ${
+                            selectedIds.has(r.id) ? "bg-primary-500 border-primary-500" : "border-gray-300"
+                          }`} style={{ width: 18, height: 18 }}>
+                            {selectedIds.has(r.id) && (
+                              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setModalReservation(r)}
+                        className="flex-1 px-3 py-3 text-left hover:bg-gray-50 transition-colors min-w-0"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm">
+                              {r.vehicles?.type === "bus" ? "🚌" : r.vehicles?.type === "van" ? "🚐" : "🚗"}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-sm text-gray-900 truncate">{r.vehicles?.name}</span>
+                                <StatusBadge status={r.status} />
+                              </div>
+                              <p className="text-xs text-gray-400 truncate">
+                                {r.guest_name} ({r.department}) · {r.start_date}
+                              </p>
+                            </div>
+                          </div>
+                          <svg className="w-4 h-4 text-gray-300 shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                      </button>
                     </div>
                   </div>
-                  <svg className="w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
+                ))}
               </div>
-            </button>
-          ))}
+            </div>
+          )}
+
+          {/* 월별 아코디언 */}
+          {monthlyGroups.map((group) => {
+            const isCollapsed = collapsedMonths.has(group.key);
+            const groupSelectedCount = group.items.filter((r) => selectedIds.has(r.id)).length;
+
+            return (
+              <div key={group.key} className="rounded-2xl overflow-hidden border border-gray-200 bg-white">
+                {/* 월별 헤더 */}
+                <button
+                  onClick={() => toggleMonth(group.key)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <svg
+                      className={`w-4 h-4 text-gray-500 transition-transform ${isCollapsed ? "" : "rotate-90"}`}
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                    <span className="text-sm font-bold text-gray-700">{group.label}</span>
+                    <span className="text-xs text-gray-400 font-medium">{group.items.length}건</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {groupSelectedCount > 0 && (
+                      <span className="text-[10px] bg-primary-100 text-primary-600 font-medium px-1.5 py-0.5 rounded-full">
+                        {groupSelectedCount}선택
+                      </span>
+                    )}
+                  </div>
+                </button>
+
+                {/* 월별 목록 */}
+                {!isCollapsed && (
+                  <div className="divide-y divide-gray-100">
+                    {group.items.map((r) => (
+                      <div
+                        key={r.id}
+                        className={`transition-colors ${
+                          selectedIds.has(r.id) ? "bg-primary-50/40" : ""
+                        }`}
+                      >
+                        <div className="flex items-center">
+                          {/* 체크박스 */}
+                          {adminRole === "super_admin" && (
+                            <button
+                              onClick={() => toggleSelect(r.id)}
+                              className="pl-3 pr-1 py-3 self-stretch flex items-center"
+                            >
+                              <div className={`rounded border-2 flex items-center justify-center transition-colors ${
+                                selectedIds.has(r.id) ? "bg-primary-500 border-primary-500" : "border-gray-300"
+                              }`} style={{ width: 18, height: 18 }}>
+                                {selectedIds.has(r.id) && (
+                                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                            </button>
+                          )}
+
+                          {/* 내용 클릭 영역 */}
+                          <button
+                            onClick={() => setModalReservation(r)}
+                            className="flex-1 px-3 py-3 text-left hover:bg-gray-50 transition-colors min-w-0"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-sm">
+                                  {r.vehicles?.type === "bus" ? "🚌" : r.vehicles?.type === "van" ? "🚐" : "🚗"}
+                                </span>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-sm text-gray-900 truncate">{r.vehicles?.name}</span>
+                                    <StatusBadge status={r.status} />
+                                  </div>
+                                  <p className="text-xs text-gray-400 truncate">
+                                    {r.guest_name} ({r.department}) · {r.start_date}
+                                  </p>
+                                </div>
+                              </div>
+                              <svg className="w-4 h-4 text-gray-300 shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </div>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* ===== 상세보기 팝업 (모달) ===== */}
+      {/* ===== 상세보기 팝업 ===== */}
       {modalReservation && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
           onClick={() => setModalReservation(null)}
         >
-          {/* 배경 오버레이 */}
           <div className="absolute inset-0 bg-black/50" />
-
-          {/* 모달 본체 */}
           <div
             className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[90vh] sm:max-h-[85vh] overflow-y-auto shadow-2xl"
             onClick={(e) => e.stopPropagation()}
@@ -481,10 +606,8 @@ export default function ReservationHistory({ adminRole }: Props) {
                   {modalReservation.vehicles?.name} · {modalReservation.start_date}
                 </p>
               </div>
-              <button
-                onClick={() => setModalReservation(null)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
+              <button onClick={() => setModalReservation(null)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                 <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -493,7 +616,6 @@ export default function ReservationHistory({ adminRole }: Props) {
 
             {/* 모달 컨텐츠 */}
             <div className="px-4 py-3 sm:px-5 sm:py-4 space-y-4">
-              {/* 상태 */}
               <div className="flex items-center gap-2">
                 <StatusBadge status={modalReservation.status} />
                 <span className="text-sm text-gray-500">
@@ -501,147 +623,94 @@ export default function ReservationHistory({ adminRole }: Props) {
                 </span>
               </div>
 
-              {/* 신청자 정보 */}
               <div>
-                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">신청자 정보</h4>
+                <h4 className="text-xs font-semibold text-gray-400 mb-2">신청자 정보</h4>
                 <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
                   <ModalRow label="이름" value={modalReservation.guest_name} />
                   <ModalRow label="부서" value={modalReservation.department} />
                   <ModalRow label="연락처" value={modalReservation.phone} />
-                  {modalReservation.driver_name && (
-                    <ModalRow label="운전자" value={modalReservation.driver_name} />
-                  )}
+                  {modalReservation.driver_name && <ModalRow label="운전자" value={modalReservation.driver_name} />}
                 </div>
               </div>
 
-              {/* 차량 정보 */}
               <div>
-                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">차량 정보</h4>
+                <h4 className="text-xs font-semibold text-gray-400 mb-2">차량 정보</h4>
                 <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
                   <ModalRow label="차량명" value={modalReservation.vehicles?.name || "-"} />
                   <ModalRow label="차량번호" value={modalReservation.vehicles?.plate_number || "-"} />
-                  <ModalRow
-                    label="차종"
-                    value={vehicleTypeLabel[modalReservation.vehicles?.type || ""] || modalReservation.vehicles?.type || "-"}
-                  />
+                  <ModalRow label="차종" value={vehicleTypeLabel[modalReservation.vehicles?.type || ""] || modalReservation.vehicles?.type || "-"} />
                   {modalReservation.vehicles?.category && (
                     <ModalRow label="분류" value={categoryLabel[modalReservation.vehicles.category] || "공유차량"} />
                   )}
                 </div>
               </div>
 
-              {/* 사용 일정 */}
               <div>
-                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">사용 일정</h4>
+                <h4 className="text-xs font-semibold text-gray-400 mb-2">사용 일정</h4>
                 <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
                   <ModalRow label="대여일시" value={`${modalReservation.start_date} ${modalReservation.start_time?.slice(0, 5)}`} />
                   <ModalRow label="반납일시" value={`${modalReservation.end_date} ${modalReservation.end_time?.slice(0, 5)}`} />
-                  {modalReservation.destination && (
-                    <ModalRow label="행선지" value={modalReservation.destination} />
-                  )}
-                  {modalReservation.passenger_count && (
-                    <ModalRow label="탑승인원" value={`${modalReservation.passenger_count}명`} />
-                  )}
-                  {modalReservation.purpose && (
-                    <ModalRow label="사용목적" value={modalReservation.purpose} />
-                  )}
-                  {modalReservation.picked_up_at && (
-                    <ModalRow label="실제 대여" value={new Date(modalReservation.picked_up_at).toLocaleString("ko-KR")} />
-                  )}
-                  {modalReservation.returned_at && (
-                    <ModalRow label="실제 반납" value={new Date(modalReservation.returned_at).toLocaleString("ko-KR")} />
-                  )}
+                  {modalReservation.destination && <ModalRow label="행선지" value={modalReservation.destination} />}
+                  {modalReservation.passenger_count && <ModalRow label="탑승인원" value={`${modalReservation.passenger_count}명`} />}
+                  {modalReservation.purpose && <ModalRow label="사용목적" value={modalReservation.purpose} />}
+                  {modalReservation.picked_up_at && <ModalRow label="실제 대여" value={new Date(modalReservation.picked_up_at).toLocaleString("ko-KR")} />}
+                  {modalReservation.returned_at && <ModalRow label="실제 반납" value={new Date(modalReservation.returned_at).toLocaleString("ko-KR")} />}
                 </div>
               </div>
 
-              {/* 관리자 메모 */}
               {modalReservation.admin_note && (
                 <div>
-                  <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">관리자 메모</h4>
+                  <h4 className="text-xs font-semibold text-gray-400 mb-2">관리자 메모</h4>
                   <div className="bg-yellow-50 rounded-xl p-3">
                     <p className="text-sm text-yellow-800">{modalReservation.admin_note}</p>
                   </div>
                 </div>
               )}
 
-              {/* 승인 현황 */}
               <div>
-                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">승인 현황</h4>
+                <h4 className="text-xs font-semibold text-gray-400 mb-2">승인 현황</h4>
                 <div className="bg-gray-50 rounded-xl p-4">
                   <div className="flex gap-4">
-                    {/* 차량담당 장로 승인 */}
                     <div className="flex-1 text-center">
-                      <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-2 ${
-                        modalReservation.staff_approved_at
-                          ? "bg-emerald-100"
-                          : "bg-gray-200"
-                      }`}>
+                      <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-2 ${modalReservation.staff_approved_at ? "bg-emerald-100" : "bg-gray-200"}`}>
                         {modalReservation.staff_approved_at ? (
-                          <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
+                          <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                         ) : (
-                          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
+                          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         )}
                       </div>
-                      <div className={`text-sm font-bold ${
-                        modalReservation.staff_approved_at ? "text-emerald-700" : "text-gray-400"
-                      }`}>
+                      <div className={`text-sm font-bold ${modalReservation.staff_approved_at ? "text-emerald-700" : "text-gray-400"}`}>
                         {modalReservation.staff_approved_at ? "승인완료" : "미승인"}
                       </div>
                       <div className="text-[10px] text-gray-500 mt-0.5">차량담당 장로</div>
                       {modalReservation.staff_approved_at && (
                         <>
-                          <div className="text-xs text-gray-600 mt-1 font-medium">
-                            {getAdminName(modalReservation.staff_approved_by)}
-                          </div>
-                          <div className="text-[10px] text-gray-400">
-                            {new Date(modalReservation.staff_approved_at).toLocaleDateString("ko-KR")}
-                          </div>
+                          <div className="text-xs text-gray-600 mt-1 font-medium">{getAdminName(modalReservation.staff_approved_by)}</div>
+                          <div className="text-[10px] text-gray-400">{new Date(modalReservation.staff_approved_at).toLocaleDateString("ko-KR")}</div>
                         </>
                       )}
                     </div>
-
-                    {/* 화살표 */}
                     <div className="flex items-center">
                       <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </div>
-
-                    {/* 기획장로 승인 */}
                     <div className="flex-1 text-center">
-                      <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-2 ${
-                        modalReservation.manager_approved_at
-                          ? "bg-green-100"
-                          : "bg-gray-200"
-                      }`}>
+                      <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-2 ${modalReservation.manager_approved_at ? "bg-green-100" : "bg-gray-200"}`}>
                         {modalReservation.manager_approved_at ? (
-                          <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
+                          <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                         ) : (
-                          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
+                          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         )}
                       </div>
-                      <div className={`text-sm font-bold ${
-                        modalReservation.manager_approved_at ? "text-green-700" : "text-gray-400"
-                      }`}>
+                      <div className={`text-sm font-bold ${modalReservation.manager_approved_at ? "text-green-700" : "text-gray-400"}`}>
                         {modalReservation.manager_approved_at ? "승인완료" : "미승인"}
                       </div>
                       <div className="text-[10px] text-gray-500 mt-0.5">기획장로</div>
                       {modalReservation.manager_approved_at && (
                         <>
-                          <div className="text-xs text-gray-600 mt-1 font-medium">
-                            {getAdminName(modalReservation.manager_approved_by)}
-                          </div>
-                          <div className="text-[10px] text-gray-400">
-                            {new Date(modalReservation.manager_approved_at).toLocaleDateString("ko-KR")}.
-                          </div>
+                          <div className="text-xs text-gray-600 mt-1 font-medium">{getAdminName(modalReservation.manager_approved_by)}</div>
+                          <div className="text-[10px] text-gray-400">{new Date(modalReservation.manager_approved_at).toLocaleDateString("ko-KR")}</div>
                         </>
                       )}
                     </div>
@@ -649,26 +718,17 @@ export default function ReservationHistory({ adminRole }: Props) {
                 </div>
               </div>
 
-              {/* 사진 */}
               {modalReservation.reservation_photos && modalReservation.reservation_photos.length > 0 && (
                 <div>
-                  <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">첨부 사진</h4>
+                  <h4 className="text-xs font-semibold text-gray-400 mb-2">첨부 사진</h4>
                   <div className="space-y-2">
                     {modalReservation.reservation_photos.filter((p) => p.photo_type === "pickup").length > 0 && (
-                      <PhotoUpload
-                        reservationId={modalReservation.id}
-                        photoType="pickup"
-                        existingPhotos={modalReservation.reservation_photos.filter((p) => p.photo_type === "pickup")}
-                        readOnly
-                      />
+                      <PhotoUpload reservationId={modalReservation.id} photoType="pickup"
+                        existingPhotos={modalReservation.reservation_photos.filter((p) => p.photo_type === "pickup")} readOnly />
                     )}
                     {modalReservation.reservation_photos.filter((p) => p.photo_type === "return").length > 0 && (
-                      <PhotoUpload
-                        reservationId={modalReservation.id}
-                        photoType="return"
-                        existingPhotos={modalReservation.reservation_photos.filter((p) => p.photo_type === "return")}
-                        readOnly
-                      />
+                      <PhotoUpload reservationId={modalReservation.id} photoType="return"
+                        existingPhotos={modalReservation.reservation_photos.filter((p) => p.photo_type === "return")} readOnly />
                     )}
                   </div>
                 </div>
@@ -677,47 +737,30 @@ export default function ReservationHistory({ adminRole }: Props) {
 
             {/* 모달 푸터 */}
             <div className="sticky bottom-0 bg-white rounded-b-2xl border-t border-gray-100 px-4 py-3 sm:px-5 flex gap-2 safe-area-bottom">
-              <button
-                onClick={() => handlePrint(modalReservation)}
-                className="flex-1 py-2.5 bg-primary-600 text-white text-sm font-semibold rounded-xl hover:bg-primary-700 transition-colors flex items-center justify-center gap-1.5"
-              >
+              <button onClick={() => handlePrint(modalReservation)}
+                className="flex-1 py-2.5 bg-primary-600 text-white text-sm font-semibold rounded-xl hover:bg-primary-700 transition-colors flex items-center justify-center gap-1.5">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                 </svg>
                 문서 출력
               </button>
               {adminRole === "super_admin" && (
-                <button
-                  onClick={() => handleDelete(modalReservation.id)}
-                  className="py-2.5 px-4 bg-red-500 text-white text-sm font-semibold rounded-xl hover:bg-red-600 transition-colors flex items-center justify-center gap-1"
-                >
+                <button onClick={() => handleDelete(modalReservation.id)}
+                  className="py-2.5 px-4 bg-red-500 text-white text-sm font-semibold rounded-xl hover:bg-red-600 transition-colors flex items-center justify-center gap-1">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                   삭제
                 </button>
               )}
-              <button
-                onClick={() => setModalReservation(null)}
-                className="py-2.5 px-6 bg-gray-100 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-200 transition-colors"
-              >
+              <button onClick={() => setModalReservation(null)}
+                className="py-2.5 px-6 bg-gray-100 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-200 transition-colors">
                 닫기
               </button>
             </div>
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-3 text-sm">
-      <span className="text-gray-500 shrink-0">{label}</span>
-      <span className="text-gray-900 text-right break-keep">{value}</span>
     </div>
   );
 }

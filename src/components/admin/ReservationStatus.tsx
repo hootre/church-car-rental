@@ -87,6 +87,46 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
       ? reservations
       : reservations.filter((r) => r.status === filter);
 
+  // 오늘 날짜 (YYYY-MM-DD)
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // 오늘 해당 항목: 오늘이 대여기간에 포함되는 예약
+  const todayItems = filtered.filter((r) => r.start_date <= todayStr && r.end_date >= todayStr);
+  const todayIds = new Set(todayItems.map((r) => r.id));
+
+  // 나머지 항목을 월별 그룹핑
+  const restItems = filtered.filter((r) => !todayIds.has(r.id));
+
+  // 월별 아코디언
+  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set());
+
+  function groupByMonth(items: Reservation[]): { key: string; label: string; items: Reservation[] }[] {
+    const groups: Record<string, Reservation[]> = {};
+    for (const r of items) {
+      const date = new Date(r.start_date || r.created_at);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(r);
+    }
+    return Object.entries(groups)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([key, items]) => {
+        const [year, month] = key.split("-");
+        return { key, label: `${year}년 ${parseInt(month)}월`, items };
+      });
+  }
+
+  const monthlyGroups = groupByMonth(restItems);
+
+  function toggleMonth(monthKey: string) {
+    setCollapsedMonths((prev) => {
+      const next = new Set(prev);
+      if (next.has(monthKey)) next.delete(monthKey);
+      else next.add(monthKey);
+      return next;
+    });
+  }
+
   // 상태 변경 가능 여부
   function canTransition(nextStatus: string): boolean {
     const requiredRoles = statusRequiredRole[nextStatus] || [];
@@ -187,36 +227,53 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-gray-400 text-sm">예약이 없습니다</div>
       ) : (
-        <div className="space-y-2">
-          {filtered.map((r) => (
-            <button
-              key={r.id}
-              onClick={() => setSelectedReservation(r)}
-              className="card !p-0 overflow-hidden w-full text-left hover:bg-gray-50 transition-colors"
-            >
-              <div className="px-4 py-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm">
-                      {r.vehicles?.type === "bus" ? "🚌" : r.vehicles?.type === "van" ? "🚐" : "🚗"}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-bold text-sm text-gray-900 truncate">{r.vehicles?.name}</span>
-                        <StatusBadge status={r.status} />
-                      </div>
-                      <p className="text-xs text-gray-400 truncate">
-                        {r.guest_name} ({r.department}) · {r.start_date}
-                      </p>
-                    </div>
-                  </div>
-                  <svg className="w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
+        <div className="space-y-3">
+          {/* 오늘 섹션 */}
+          {todayItems.length > 0 && (
+            <div className="rounded-2xl overflow-hidden border-2 border-primary-200 bg-white">
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-primary-50">
+                <span className="text-sm">📌</span>
+                <span className="text-sm font-bold text-primary-700">오늘</span>
+                <span className="text-xs text-primary-500 font-medium">{todayItems.length}건</span>
               </div>
-            </button>
-          ))}
+              <div className="divide-y divide-gray-100">
+                {todayItems.map((r) => (
+                  <ReservationRow key={r.id} r={r} onClick={() => setSelectedReservation(r)} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 월별 아코디언 */}
+          {monthlyGroups.map((group) => {
+            const isCollapsed = collapsedMonths.has(group.key);
+            return (
+              <div key={group.key} className="rounded-2xl overflow-hidden border border-gray-200 bg-white">
+                <button
+                  onClick={() => toggleMonth(group.key)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <svg
+                      className={`w-4 h-4 text-gray-500 transition-transform ${isCollapsed ? "" : "rotate-90"}`}
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                    <span className="text-sm font-bold text-gray-700">{group.label}</span>
+                    <span className="text-xs text-gray-400 font-medium">{group.items.length}건</span>
+                  </div>
+                </button>
+                {!isCollapsed && (
+                  <div className="divide-y divide-gray-100">
+                    {group.items.map((r) => (
+                      <ReservationRow key={r.id} r={r} onClick={() => setSelectedReservation(r)} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -435,6 +492,37 @@ function StatCard({ label, count, bg, color, subColor, active, onClick }: {
     >
       <div className={`text-lg font-bold ${color}`}>{count}</div>
       <div className={`text-[10px] leading-tight ${active ? subColor + " font-semibold" : "text-gray-500"}`}>{label}</div>
+    </button>
+  );
+}
+
+function ReservationRow({ r, onClick }: { r: Reservation; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left hover:bg-gray-50 transition-colors"
+    >
+      <div className="px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm">
+              {r.vehicles?.type === "bus" ? "🚌" : r.vehicles?.type === "van" ? "🚐" : "🚗"}
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-bold text-sm text-gray-900 truncate">{r.vehicles?.name}</span>
+                <StatusBadge status={r.status} />
+              </div>
+              <p className="text-xs text-gray-400 truncate">
+                {r.guest_name} ({r.department}) · {r.start_date}
+              </p>
+            </div>
+          </div>
+          <svg className="w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
     </button>
   );
 }
