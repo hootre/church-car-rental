@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { notifyAdminsNewReservation, notifyUserApproved } from "@/lib/notifications";
+import { notifyUserApproved } from "@/lib/notifications";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -97,24 +97,6 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    // 관리자에게 SMS 알림 (비동기)
-    if (data) {
-      const { data: vehicle } = await supabase
-        .from("vehicles")
-        .select("name")
-        .eq("id", vehicle_id)
-        .single();
-
-      notifyAdminsNewReservation({
-        guest_name: data.guest_name,
-        phone: data.phone,
-        department: data.department,
-        vehicle_name: vehicle?.name || "차량",
-        start_date: data.start_date,
-        end_date: data.end_date,
-      }).catch((err) => console.error("[SMS] 관리자 알림 실패:", err));
     }
 
     return NextResponse.json(data, { status: 201 });

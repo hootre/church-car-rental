@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
 import Header from "@/components/Header";
 import ReservationStatus from "@/components/admin/ReservationStatus";
@@ -9,7 +9,7 @@ import VehicleManagement from "@/components/admin/VehicleManagement";
 import AdminManagement from "@/components/admin/AdminManagement";
 import CalendarView from "@/components/admin/CalendarView";
 import SmsSettings from "@/components/admin/SmsSettings";
-import { roleLabel } from "@/lib/supabase";
+import { roleLabel, supabase } from "@/lib/supabase";
 
 type Tab = "calendar" | "status" | "history" | "vehicles" | "admins";
 
@@ -27,6 +27,21 @@ export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("calendar");
+  const [pendingCount, setPendingCount] = useState(0);
+
+  const fetchPendingCount = useCallback(async () => {
+    const { count } = await supabase
+      .from("reservations")
+      .select("*", { count: "exact", head: true })
+      .in("status", ["pending", "staff_approved"]);
+    setPendingCount(count || 0);
+  }, []);
+
+  useEffect(() => {
+    if (authenticated) {
+      fetchPendingCount();
+    }
+  }, [authenticated, fetchPendingCount]);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("admin_session");
@@ -159,10 +174,15 @@ export default function AdminPage() {
         <div className="flex gap-0.5 bg-gray-100 rounded-xl p-1 mb-4 overflow-x-auto scrollbar-hide">
           {visibleTabs.map((tab) => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 min-w-0 py-2 px-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap text-center ${
+              className={`relative flex-1 min-w-0 py-2 px-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap text-center ${
                 activeTab === tab.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
               }`}>
               <span className="mr-0.5">{tab.icon}</span>{tab.label}
+              {tab.key === "status" && pendingCount > 0 && (
+                <span className="absolute -top-1 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1">
+                  {pendingCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
