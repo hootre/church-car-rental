@@ -20,6 +20,7 @@ export default function AdminManagement({ currentAdminId }: Props) {
     password: "",
     password_confirm: "",
     name: "",
+    phone: "",
     role: "member" as "member" | "staff" | "manager" | "emergency" | "super_admin",
   });
 
@@ -73,6 +74,7 @@ export default function AdminManagement({ currentAdminId }: Props) {
           login_id: form.login_id.trim(),
           password: form.password,
           name: form.name.trim(),
+          phone: form.phone.trim() || null,
           role: form.role,
         }),
       });
@@ -81,7 +83,7 @@ export default function AdminManagement({ currentAdminId }: Props) {
       if (res.ok) {
         toast.success("관리자가 추가되었습니다");
         setShowForm(false);
-        setForm({ login_id: "", password: "", password_confirm: "", name: "", role: "member" });
+        setForm({ login_id: "", password: "", password_confirm: "", name: "", phone: "", role: "member" });
         fetchAdmins();
       } else {
         toast.error(data.error || "추가에 실패했습니다");
@@ -271,19 +273,31 @@ export default function AdminManagement({ currentAdminId }: Props) {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">권한</label>
-            <select
-              value={form.role}
-              onChange={(e) => setForm((p) => ({ ...p, role: e.target.value as "member" | "staff" | "manager" | "emergency" | "super_admin" }))}
-              className="input-field !py-2 text-sm"
-            >
-              <option value="member">부원 (조회만)</option>
-              <option value="staff">차량담당 장로 (1차 승인)</option>
-              <option value="manager">기획장로 (최종 승인)</option>
-              <option value="emergency">긴급승인자 (1차+2차 승인)</option>
-              <option value="super_admin">최고관리자 (모든 권한)</option>
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">전화번호 (SMS 수신)</label>
+              <input
+                type="tel"
+                value={form.phone}
+                onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+                placeholder="010-0000-0000"
+                className="input-field !py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">권한</label>
+              <select
+                value={form.role}
+                onChange={(e) => setForm((p) => ({ ...p, role: e.target.value as "member" | "staff" | "manager" | "emergency" | "super_admin" }))}
+                className="input-field !py-2 text-sm"
+              >
+                <option value="member">부원 (조회만)</option>
+                <option value="staff">차량담당 장로 (1차 승인)</option>
+                <option value="manager">기획장로 (최종 승인)</option>
+                <option value="emergency">긴급승인자 (1차+2차 승인)</option>
+                <option value="super_admin">최고관리자 (모든 권한)</option>
+              </select>
+            </div>
           </div>
 
           <div className="flex gap-2 pt-1">
@@ -343,8 +357,9 @@ export default function AdminManagement({ currentAdminId }: Props) {
                   </div>
                   <p className="text-xs text-gray-500">
                     @{admin.login_id}
+                    {admin.phone && ` · 📱${admin.phone}`}
                     {admin.last_login_at &&
-                      ` · 최근 로그인: ${new Date(admin.last_login_at).toLocaleDateString("ko-KR")}`}
+                      ` · ${new Date(admin.last_login_at).toLocaleDateString("ko-KR")}`}
                   </p>
                 </div>
 

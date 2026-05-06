@@ -158,6 +158,7 @@ export interface Admin {
   id: string;
   login_id: string;
   name: string;
+  phone: string | null;
   role: "super_admin" | "staff" | "manager" | "member" | "emergency";
   is_active: boolean;
   created_at: string;

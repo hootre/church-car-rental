@@ -11,7 +11,7 @@ const supabase = createClient(
 export async function GET() {
   const { data, error } = await supabase
     .from("admins")
-    .select("id, login_id, name, role, is_active, created_at, last_login_at")
+    .select("id, login_id, name, phone, role, is_active, created_at, last_login_at")
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -24,7 +24,7 @@ export async function GET() {
 // 관리자 추가
 export async function POST(request: NextRequest) {
   try {
-    const { login_id, password, name, role } = await request.json();
+    const { login_id, password, name, phone, role } = await request.json();
 
     if (!login_id || !password || !name) {
       return NextResponse.json(
@@ -56,9 +56,10 @@ export async function POST(request: NextRequest) {
         login_id,
         password_hash,
         name,
+        phone: phone || null,
         role: role || "admin",
       })
-      .select("id, login_id, name, role, is_active, created_at")
+      .select("id, login_id, name, phone, role, is_active, created_at")
       .single();
 
     if (error) {
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, password, is_active } = body;
+    const { id, password, is_active, phone } = body;
 
     if (!id) {
       return NextResponse.json({ error: "ID가 필요합니다" }, { status: 400 });
@@ -93,6 +94,10 @@ export async function PATCH(request: NextRequest) {
 
     if (typeof is_active === "boolean") {
       updates.is_active = is_active;
+    }
+
+    if (typeof phone === "string") {
+      updates.phone = phone || null;
     }
 
     if (Object.keys(updates).length === 0) {

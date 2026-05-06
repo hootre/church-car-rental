@@ -8,6 +8,7 @@ import ReservationHistory from "@/components/admin/ReservationHistory";
 import VehicleManagement from "@/components/admin/VehicleManagement";
 import AdminManagement from "@/components/admin/AdminManagement";
 import CalendarView from "@/components/admin/CalendarView";
+import SmsSettings from "@/components/admin/SmsSettings";
 import { roleLabel } from "@/lib/supabase";
 
 type Tab = "calendar" | "status" | "history" | "vehicles" | "admins";
@@ -173,7 +174,10 @@ export default function AdminPage() {
         {activeTab === "history" && <ReservationHistory />}
         {activeTab === "vehicles" && <VehicleManagement />}
         {activeTab === "admins" && adminSession?.role === "super_admin" && (
-          <AdminManagement currentAdminId={adminSession.id} />
+          <>
+            <SmsSettings adminId={adminSession.id} />
+            <AdminManagement currentAdminId={adminSession.id} />
+          </>
         )}
       </main>
     </div>
