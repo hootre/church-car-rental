@@ -28,6 +28,11 @@ export default function SmsSettings({ adminId }: Props) {
   const [toggling, setToggling] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
 
+  // 테스트 발송
+  const [testPhone, setTestPhone] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; diagnostics: string[]; error?: string } | null>(null);
+
   useEffect(() => {
     fetchSettings();
   }, []);
@@ -115,6 +120,34 @@ export default function SmsSettings({ adminId }: Props) {
       toast.error("서버 오류");
     }
     setSavingTemplate(false);
+  }
+
+  // 테스트 발송
+  async function handleTestSms() {
+    if (!testPhone.trim()) {
+      toast.error("수신 번호를 입력해 주세요");
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/admin/sms-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: testPhone.trim() }),
+      });
+      const data = await res.json();
+      setTestResult(data);
+      if (data.success) {
+        toast.success("테스트 SMS 발송 성공!");
+      } else {
+        toast.error("발송 실패 - 아래 진단 결과를 확인하세요");
+      }
+    } catch {
+      setTestResult({ success: false, diagnostics: ["서버 연결 실패"], error: "서버 오류" });
+      toast.error("서버 오류");
+    }
+    setTesting(false);
   }
 
   // 미리보기 생성
@@ -259,6 +292,44 @@ export default function SmsSettings({ adminId }: Props) {
           /* 읽기 모드 */
           <div className="bg-gray-50 rounded-xl p-3">
             <p className="text-xs text-gray-700 whitespace-pre-line">{getPreview(messageTemplate)}</p>
+          </div>
+        )}
+      </div>
+
+      {/* 구분선 */}
+      <div className="border-t border-gray-100" />
+
+      {/* 테스트 발송 */}
+      <div>
+        <h4 className="text-xs font-semibold text-gray-500 mb-2">테스트 발송</h4>
+        <div className="flex gap-2">
+          <input
+            type="tel"
+            value={testPhone}
+            onChange={(e) => setTestPhone(e.target.value)}
+            placeholder="수신번호 (010-0000-0000)"
+            className="input-field !py-2 text-xs flex-1"
+          />
+          <button
+            onClick={handleTestSms}
+            disabled={testing}
+            className="px-4 py-2 bg-green-500 text-white text-xs font-medium rounded-lg hover:bg-green-600 transition-colors whitespace-nowrap"
+          >
+            {testing ? "발송 중..." : "테스트"}
+          </button>
+        </div>
+
+        {/* 진단 결과 */}
+        {testResult && (
+          <div className={`mt-2 rounded-xl p-3 ${testResult.success ? "bg-green-50" : "bg-red-50"}`}>
+            <p className={`text-xs font-bold mb-1.5 ${testResult.success ? "text-green-700" : "text-red-700"}`}>
+              {testResult.success ? "✅ 발송 성공" : `❌ 발송 실패: ${testResult.error}`}
+            </p>
+            <div className="space-y-0.5">
+              {testResult.diagnostics.map((d, i) => (
+                <p key={i} className="text-[10px] text-gray-600 font-mono">{d}</p>
+              ))}
+            </div>
           </div>
         )}
       </div>
