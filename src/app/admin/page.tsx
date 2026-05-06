@@ -206,7 +206,7 @@ export default function AdminPage() {
           <ReservationStatus adminId={adminSession.id} adminRole={adminSession.role} />
         )}
         {activeTab === "history" && <ReservationHistory adminRole={adminSession?.role} adminId={adminSession?.id} />}
-        {activeTab === "vehicles" && <VehicleManagement />}
+        {activeTab === "vehicles" && adminSession && <VehicleManagement adminId={adminSession.id} adminName={adminSession.name} adminRole={adminSession.role} />}
         {activeTab === "admins" && adminSession?.role === "super_admin" && (
           <>
             <SmsSettings adminId={adminSession.id} />

@@ -16,10 +16,12 @@ const ACTION_LABELS: Record<string, string> = {
   admin_delete: "관리자 삭제",
   admin_edit: "관리자 수정",
   reservation_delete: "예약 삭제",
-  reservation_status_change: "예약 상태 변경",
+  reservation_status_change: "상태 변경",
   vehicle_add: "차량 추가",
   vehicle_delete: "차량 삭제",
-  sms_settings_change: "SMS 설정 변경",
+  vehicle_edit: "차량 수정",
+  vehicle_status_change: "차량 상태",
+  sms_settings_change: "SMS 설정",
 };
 
 const ACTION_COLORS: Record<string, string> = {
@@ -30,6 +32,8 @@ const ACTION_COLORS: Record<string, string> = {
   reservation_status_change: "bg-yellow-100 text-yellow-700",
   vehicle_add: "bg-green-100 text-green-700",
   vehicle_delete: "bg-red-100 text-red-700",
+  vehicle_edit: "bg-blue-100 text-blue-700",
+  vehicle_status_change: "bg-orange-100 text-orange-700",
   sms_settings_change: "bg-purple-100 text-purple-700",
 };
 
@@ -69,6 +73,18 @@ export default function AdminLogs() {
         return `${d.guest_name} - ${d.vehicle_name} (${d.start_date})`;
       case "reservation_status_change":
         return `${d.guest_name} → ${d.new_status}`;
+      case "vehicle_add":
+        return `"${d.vehicle_name}" (${d.plate_number})`;
+      case "vehicle_delete":
+        return `"${d.vehicle_name}" (${d.plate_number})`;
+      case "vehicle_edit":
+        return `"${d.vehicle_name}" 정보 수정`;
+      case "vehicle_status_change":
+        return `"${d.vehicle_name}" → ${d.available ? "사용가능" : "사용불가"}`;
+      case "sms_settings_change":
+        if (d.mode) return `모드 변경: ${d.mode}`;
+        if (d.template_changed) return "메시지 템플릿 변경";
+        return "설정 변경";
       default:
         return JSON.stringify(d);
     }

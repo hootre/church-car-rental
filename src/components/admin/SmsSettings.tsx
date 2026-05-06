@@ -140,6 +140,8 @@ export default function SmsSettings({ adminId }: Props) {
       setTestResult(data);
       if (data.success) {
         toast.success("테스트 SMS 발송 성공!");
+        // 발송 건수 갱신
+        fetchSettings();
       } else {
         toast.error("발송 실패 - 아래 진단 결과를 확인하세요");
       }

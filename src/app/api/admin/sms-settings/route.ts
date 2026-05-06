@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { writeAdminLog } from "@/lib/admin-log";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -70,6 +71,27 @@ export async function PATCH(request: NextRequest) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // 로그 기록
+    if (admin_id) {
+      const { data: adminData } = await supabase
+        .from("admins")
+        .select("name")
+        .eq("id", admin_id)
+        .single();
+
+      const logDetails: Record<string, unknown> = {};
+      if (mode) logDetails.mode = mode;
+      if (typeof message_template === "string") logDetails.template_changed = true;
+
+      writeAdminLog({
+        admin_id,
+        admin_name: adminData?.name || "관리자",
+        action: "sms_settings_change",
+        target_type: "settings",
+        details: logDetails,
+      });
     }
 
     return NextResponse.json({ success: true });

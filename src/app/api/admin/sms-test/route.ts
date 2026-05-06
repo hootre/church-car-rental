@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 // 테스트 발송 - 환경변수, API 연결, 실제 발송까지 단계별 진단
 export async function POST(request: NextRequest) {
@@ -95,6 +101,16 @@ export async function POST(request: NextRequest) {
     }
 
     diagnostics.push(`[11] 발송 완료!`);
+
+    // sms_logs에 기록 (발송 건수 카운트용)
+    try {
+      await supabase.from("sms_logs").insert({
+        recipient: cleanPhone,
+        message: testMessage,
+      });
+    } catch {
+      // 테이블 없으면 무시
+    }
 
     return NextResponse.json({
       success: true,

@@ -267,7 +267,13 @@ function VehicleCard({ v, status, onLoadDetail, onToggleAvailable }: VehicleCard
 }
 
 // ========== Main Component ==========
-export default function VehicleManagement() {
+interface VehicleMgmtProps {
+  adminId?: string;
+  adminName?: string;
+  adminRole?: string;
+}
+
+export default function VehicleManagement({ adminId, adminName, adminRole }: VehicleMgmtProps) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
@@ -276,6 +282,21 @@ export default function VehicleManagement() {
 
   // 현재 사용중인 차량 ID 목록
   const [inUseVehicleIds, setInUseVehicleIds] = useState<Set<string>>(new Set());
+
+  // 로그 기록 헬퍼
+  async function logAction(action: string, targetType: string, targetId?: string, details?: Record<string, unknown>) {
+    if (!adminId) return;
+    try {
+      await supabase.from("admin_logs").insert({
+        admin_id: adminId,
+        admin_name: adminName || "관리자",
+        action,
+        target_type: targetType,
+        target_id: targetId || null,
+        details: details || {},
+      });
+    } catch { /* ignore */ }
+  }
 
   // 보험/정비 데이터
   const [insurances, setInsurances] = useState<VehicleInsurance[]>([]);
@@ -388,6 +409,9 @@ export default function VehicleManagement() {
     if (error) toast.error("변경 실패");
     else {
       toast.success(!vehicle.available ? "사용가능으로 변경됨" : "사용불가로 변경됨");
+      if (adminId) {
+        logAction("vehicle_status_change", "vehicle", vehicle.id, { vehicle_name: vehicle.name, available: !vehicle.available });
+      }
       fetchVehicles();
     }
   }
@@ -425,6 +449,10 @@ export default function VehicleManagement() {
       console.error(error);
     } else {
       toast.success("차량이 추가되었습니다");
+      // 로그 기록
+      if (adminId) {
+        logAction("vehicle_add", "vehicle", undefined, { vehicle_name: addForm.name.trim(), plate_number: addForm.plate_number.trim() });
+      }
       setShowAddVehicle(false);
       setAddForm({
         name: "",
@@ -497,6 +525,9 @@ export default function VehicleManagement() {
       toast.error("수정에 실패했습니다");
     } else {
       toast.success("차량 정보가 수정되었습니다");
+      if (adminId) {
+        logAction("vehicle_edit", "vehicle", selectedVehicle.id, { vehicle_name: editForm.name });
+      }
       setEditingInfo(false);
       fetchVehicles();
       const { data } = await supabase.from("vehicles").select("*").eq("id", selectedVehicle.id).single();
@@ -528,6 +559,10 @@ export default function VehicleManagement() {
       toast.error("삭제에 실패했습니다");
     } else {
       toast.success("차량이 삭제되었습니다");
+      // 로그 기록
+      if (adminId) {
+        logAction("vehicle_delete", "vehicle", selectedVehicle.id, { vehicle_name: selectedVehicle.name, plate_number: selectedVehicle.plate_number });
+      }
       setSelectedVehicle(null);
       fetchVehicles();
     }
