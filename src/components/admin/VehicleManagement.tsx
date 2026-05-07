@@ -214,12 +214,20 @@ interface VehicleCardProps {
 }
 
 function formatInsuranceExpiry(dateStr: string | null | undefined): { text: string; isUrgent: boolean; isExpired: boolean } {
-  if (!dateStr) return { text: "-", isUrgent: false, isExpired: false };
-  const expiry = new Date(dateStr);
+  if (!dateStr || !dateStr.trim()) return { text: "미등록", isUrgent: false, isExpired: false };
+  // YYYY-MM-DD 형식 직접 파싱 (Date 생성자 timezone 이슈 방지)
+  const parts = dateStr.split("-");
+  if (parts.length !== 3) return { text: dateStr, isUrgent: false, isExpired: false };
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+  const day = parseInt(parts[2], 10);
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return { text: dateStr, isUrgent: false, isExpired: false };
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const expiry = new Date(year, month - 1, day);
   const diffDays = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  const formatted = `${expiry.getFullYear()}년 ${String(expiry.getMonth() + 1).padStart(2, "0")}월 ${String(expiry.getDate()).padStart(2, "0")}일`;
+  const formatted = `${year}년 ${String(month).padStart(2, "0")}월 ${String(day).padStart(2, "0")}일`;
   return {
     text: formatted,
     isUrgent: diffDays <= 30 && diffDays > 0,
