@@ -74,8 +74,19 @@ export default function AdminLogs() {
         return "정보 수정";
       case "reservation_delete":
         return `${d.guest_name} - ${d.vehicle_name} (${d.start_date})`;
-      case "reservation_status_change":
-        return `${d.guest_name} → ${d.new_status}`;
+      case "reservation_status_change": {
+        const STATUS_KO: Record<string, string> = {
+          pending: "대기",
+          staff_approved: "1차승인",
+          approved: "최종승인",
+          rejected: "반려",
+          in_use: "대여중",
+          returned: "반납완료",
+          cancelled: "취소",
+        };
+        const statusKo = STATUS_KO[d.new_status as string] || String(d.new_status);
+        return `${d.guest_name} → ${statusKo}`;
+      }
       case "vehicle_add":
         return `"${d.vehicle_name}" (${d.plate_number})`;
       case "vehicle_delete":

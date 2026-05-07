@@ -213,8 +213,23 @@ interface VehicleCardProps {
   onToggleAvailable: (vehicle: Vehicle) => void;
 }
 
+function formatInsuranceExpiry(dateStr: string | null | undefined): { text: string; isUrgent: boolean; isExpired: boolean } {
+  if (!dateStr) return { text: "-", isUrgent: false, isExpired: false };
+  const expiry = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const formatted = `${expiry.getFullYear()}년 ${String(expiry.getMonth() + 1).padStart(2, "0")}월 ${String(expiry.getDate()).padStart(2, "0")}일`;
+  return {
+    text: formatted,
+    isUrgent: diffDays <= 30 && diffDays > 0,
+    isExpired: diffDays <= 0,
+  };
+}
+
 function VehicleCard({ v, status, onLoadDetail, onToggleAvailable }: VehicleCardProps) {
   const cfg = statusConfig[status];
+  const insurance = formatInsuranceExpiry(v.insurance_expiry);
 
   return (
     <div className="card !p-3">
@@ -257,11 +272,27 @@ function VehicleCard({ v, status, onLoadDetail, onToggleAvailable }: VehicleCard
           )}
         </div>
       </div>
-      {v.insurance_company && (
-        <div className="mt-1.5 text-[10px] text-gray-400">
-          보험: {v.insurance_company} (만기: {v.insurance_expiry})
-        </div>
-      )}
+      {/* 보험 만기일 - 상태 아래 강조 표시 */}
+      <div className={`mt-1.5 text-[11px] font-semibold flex items-center gap-1 ${
+        insurance.isExpired
+          ? "text-red-600"
+          : insurance.isUrgent
+            ? "text-orange-600"
+            : "text-gray-500"
+      }`}>
+        <span>🛡️ 보험 만기:</span>
+        <span className={`${
+          insurance.isExpired
+            ? "bg-red-100 text-red-700 px-1.5 py-0.5 rounded"
+            : insurance.isUrgent
+              ? "bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded"
+              : ""
+        }`}>
+          {v.insurance_expiry ? insurance.text : "미등록"}
+        </span>
+        {insurance.isExpired && <span className="text-red-600 font-bold">만료됨</span>}
+        {insurance.isUrgent && <span className="text-orange-600 font-bold">곧 만료</span>}
+      </div>
     </div>
   );
 }
@@ -279,6 +310,7 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>("info");
   const [filterType, setFilterType] = useState("all");
+  const [sortMode, setSortMode] = useState<"capacity" | "insurance">("capacity");
 
   // 현재 사용중인 차량 ID 목록
   const [inUseVehicleIds, setInUseVehicleIds] = useState<Set<string>>(new Set());
@@ -642,18 +674,26 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
     { available: 0, in_use: 0, unavailable: 0 } as Record<VehicleStatus, number>
   );
 
-  // 필터 + 정렬 (다인승 순)
-  const sortByCapacity = (a: Vehicle, b: Vehicle) => (b.capacity || 0) - (a.capacity || 0);
+  // 필터 + 정렬
+  const sortFn = (a: Vehicle, b: Vehicle) => {
+    if (sortMode === "insurance") {
+      // 보험만기일순 (가까운 날짜 먼저, 미등록은 맨 뒤)
+      const aDate = a.insurance_expiry || "9999-12-31";
+      const bDate = b.insurance_expiry || "9999-12-31";
+      return aDate.localeCompare(bDate);
+    }
+    return (b.capacity || 0) - (a.capacity || 0);
+  };
   const typeFilter = (v: Vehicle) => filterType === "all" || v.type === filterType;
 
   const sharedVehicles = vehicles
     .filter((v) => (v.category || "shared") === "shared")
     .filter(typeFilter)
-    .sort(sortByCapacity);
+    .sort(sortFn);
   const personalVehicles = vehicles
     .filter((v) => v.category === "personal")
     .filter(typeFilter)
-    .sort(sortByCapacity);
+    .sort(sortFn);
 
   const typeFilters: { key: string; label: string }[] = [
     { key: "all", label: "전체" },
@@ -722,21 +762,33 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
         </div>
       </div>
 
-      {/* 차종 필터 */}
-      <div className="flex gap-1.5 mb-4 overflow-x-auto scrollbar-hide">
-        {typeFilters.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilterType(f.key)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-              filterType === f.key
-                ? "bg-primary-600 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      {/* 차종 필터 + 정렬 */}
+      <div className="flex items-center gap-2 mb-4">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide flex-1">
+          {typeFilters.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setFilterType(f.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                filterType === f.key
+                  ? "bg-primary-600 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => setSortMode(sortMode === "capacity" ? "insurance" : "capacity")}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${
+            sortMode === "insurance"
+              ? "bg-orange-500 text-white"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          {sortMode === "insurance" ? "🛡️ 보험만기일순" : "보험만기일순"}
+        </button>
       </div>
 
       {loading ? (
