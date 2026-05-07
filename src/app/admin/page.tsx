@@ -26,6 +26,7 @@ export default function AdminPage() {
   const [adminSession, setAdminSession] = useState<AdminSession | null>(null);
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("calendar");
   const [pendingCount, setPendingCount] = useState(0);
@@ -53,13 +54,15 @@ export default function AdminPage() {
   }, [authenticated, fetchPendingCount]);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem("admin_session");
+    // localStorage(로그인 유지) 먼저 확인, 없으면 sessionStorage
+    const stored = localStorage.getItem("admin_session") || sessionStorage.getItem("admin_session");
     if (stored) {
       try {
         const session = JSON.parse(stored);
         setAdminSession(session);
         setAuthenticated(true);
       } catch {
+        localStorage.removeItem("admin_session");
         sessionStorage.removeItem("admin_session");
       }
     }
@@ -89,7 +92,11 @@ export default function AdminPage() {
           name: data.admin.name,
           role: data.admin.role,
         };
-        sessionStorage.setItem("admin_session", JSON.stringify(session));
+        if (rememberMe) {
+          localStorage.setItem("admin_session", JSON.stringify(session));
+        } else {
+          sessionStorage.setItem("admin_session", JSON.stringify(session));
+        }
         setAdminSession(session);
         setAuthenticated(true);
         toast.success(`${session.name}님 환영합니다`);
@@ -103,6 +110,7 @@ export default function AdminPage() {
   }
 
   function handleLogout() {
+    localStorage.removeItem("admin_session");
     sessionStorage.removeItem("admin_session");
     setAdminSession(null);
     setAuthenticated(false);
@@ -138,6 +146,15 @@ export default function AdminPage() {
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
                 placeholder="비밀번호" className="input-field" />
             </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              />
+              <span className="text-sm text-gray-600">로그인 유지</span>
+            </label>
             <button type="submit" disabled={authLoading || !loginId || !password} className="btn-primary">
               {authLoading ? "로그인 중..." : "로그인"}
             </button>
