@@ -76,6 +76,14 @@ export default function HomePage() {
         {/* 이용 안내 */}
         <div className="mt-6 p-4 bg-blue-50 rounded-2xl">
           <h3 className="font-semibold text-primary-800 text-sm mb-2">이용안내</h3>
+
+          {/* 강조 안내 */}
+          <div className="mb-3 p-3 bg-amber-100 border-2 border-amber-300 rounded-xl">
+            <p className="text-sm font-bold text-amber-900 leading-relaxed text-center">
+              🔑 승인이 완료되면<br />주차관리실에 방문하시면 됩니다.
+            </p>
+          </div>
+
           <ul className="text-xs text-primary-700 space-y-1.5 leading-relaxed">
             <li>• 차량은 2주일 전 신청을 원칙으로 합니다</li>
             <li>• 예약 신청 후 관리자 승인이 필요합니다</li>

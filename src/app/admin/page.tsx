@@ -11,6 +11,7 @@ import CalendarView from "@/components/admin/CalendarView";
 import SmsSettings from "@/components/admin/SmsSettings";
 import AdminLogs from "@/components/admin/AdminLogs";
 import { roleLabel, supabase } from "@/lib/supabase";
+import { FEATURE_FLAGS } from "@/lib/feature-flags";
 
 type Tab = "calendar" | "status" | "history" | "vehicles" | "admins";
 
@@ -226,7 +227,8 @@ export default function AdminPage() {
         {activeTab === "vehicles" && adminSession && <VehicleManagement adminId={adminSession.id} adminName={adminSession.name} adminRole={adminSession.role} />}
         {activeTab === "admins" && adminSession?.role === "super_admin" && (
           <>
-            <SmsSettings adminId={adminSession.id} />
+            {/* SMS 설정은 FEATURE_FLAGS.SMS_ENABLED=true 일 때만 노출 */}
+            {FEATURE_FLAGS.SMS_ENABLED && <SmsSettings adminId={adminSession.id} />}
             <AdminManagement currentAdminId={adminSession.id} currentAdminRole={adminSession.role} currentAdminName={adminSession.name} />
             <AdminLogs />
           </>

@@ -431,7 +431,8 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
     const [insRes, maintRes, histRes] = await Promise.all([
       supabase.from("vehicle_insurance").select("*").eq("vehicle_id", vehicle.id).order("end_date", { ascending: false }),
       supabase.from("vehicle_maintenance").select("*").eq("vehicle_id", vehicle.id).order("maintenance_date", { ascending: false }),
-      supabase.from("reservations").select("*").eq("vehicle_id", vehicle.id).order("start_date", { ascending: false }),
+      // 사용기록 = 반납완료된 예약만
+      supabase.from("reservations").select("*").eq("vehicle_id", vehicle.id).eq("status", "returned").order("start_date", { ascending: false }),
     ]);
 
     setInsurances(insRes.data || []);

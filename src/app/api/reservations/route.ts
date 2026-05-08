@@ -110,12 +110,24 @@ export async function POST(request: NextRequest) {
 }
 
 // 예약 상태 업데이트 (관리자)
+// - status 만 보내면 상태 전이
+// - vehicle_id / start_date / start_time / end_date / end_time 만 보내면 일정 수정
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, status, admin_note, admin_id } = body;
+    const {
+      id,
+      status,
+      admin_note,
+      admin_id,
+      vehicle_id,
+      start_date,
+      start_time,
+      end_date,
+      end_time,
+    } = body;
 
-    if (!id || !status) {
+    if (!id) {
       return NextResponse.json(
         { error: "필수 항목이 누락되었습니다" },
         { status: 400 }
@@ -123,31 +135,45 @@ export async function PATCH(request: NextRequest) {
     }
 
     // 업데이트 데이터 구성
-    const updateData: Record<string, unknown> = {
-      status,
-      admin_note: admin_note || null,
-    };
+    const updateData: Record<string, unknown> = {};
 
-    // 담당 승인 시
-    if (status === "staff_approved" && admin_id) {
-      updateData.staff_approved_by = admin_id;
-      updateData.staff_approved_at = new Date().toISOString();
+    // (1) 상태 전이
+    if (status) {
+      updateData.status = status;
+      updateData.admin_note = admin_note || null;
+
+      // 담당 승인 시
+      if (status === "staff_approved" && admin_id) {
+        updateData.staff_approved_by = admin_id;
+        updateData.staff_approved_at = new Date().toISOString();
+      }
+      // 부장 최종 승인 시
+      if (status === "approved" && admin_id) {
+        updateData.manager_approved_by = admin_id;
+        updateData.manager_approved_at = new Date().toISOString();
+      }
+      // 대여 시작 시
+      if (status === "in_use") {
+        updateData.picked_up_at = new Date().toISOString();
+      }
+      // 반납 시
+      if (status === "returned") {
+        updateData.returned_at = new Date().toISOString();
+      }
     }
 
-    // 부장 최종 승인 시
-    if (status === "approved" && admin_id) {
-      updateData.manager_approved_by = admin_id;
-      updateData.manager_approved_at = new Date().toISOString();
-    }
+    // (2) 일정/차량 편집
+    if (vehicle_id) updateData.vehicle_id = vehicle_id;
+    if (start_date) updateData.start_date = start_date;
+    if (start_time) updateData.start_time = start_time;
+    if (end_date) updateData.end_date = end_date;
+    if (end_time) updateData.end_time = end_time;
 
-    // 대여 시작 시
-    if (status === "in_use") {
-      updateData.picked_up_at = new Date().toISOString();
-    }
-
-    // 반납 시
-    if (status === "returned") {
-      updateData.returned_at = new Date().toISOString();
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(
+        { error: "변경할 내용이 없습니다" },
+        { status: 400 }
+      );
     }
 
     const { data, error } = await supabase
@@ -161,7 +187,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // 최종 승인 시 사용자에게 SMS
+    // 최종 승인 시 사용자에게 SMS (status="approved" 인 경우에만)
     if (data && status === "approved") {
       notifyUserApproved({
         guest_name: data.guest_name,
@@ -173,26 +199,38 @@ export async function PATCH(request: NextRequest) {
       }).catch((err) => console.error("[SMS] 사용자 알림 실패:", err));
     }
 
-    // 상태 변경 로그
+    // 활동 로그
     if (admin_id && data) {
-      // admin 이름 조회
       const { data: adminData } = await supabase
         .from("admins")
         .select("name")
         .eq("id", admin_id)
         .single();
 
+      const isStatusChange = !!status;
       writeAdminLog({
         admin_id,
         admin_name: adminData?.name || "관리자",
-        action: "reservation_status_change",
+        action: isStatusChange ? "reservation_status_change" : "reservation_edit",
         target_type: "reservation",
         target_id: id,
-        details: {
-          new_status: status,
-          guest_name: data.guest_name,
-          vehicle_name: data.vehicles?.name,
-        },
+        details: isStatusChange
+          ? {
+              new_status: status,
+              guest_name: data.guest_name,
+              vehicle_name: data.vehicles?.name,
+            }
+          : {
+              edited_fields: {
+                vehicle_id: vehicle_id ?? null,
+                start_date: start_date ?? null,
+                start_time: start_time ?? null,
+                end_date: end_date ?? null,
+                end_time: end_time ?? null,
+              },
+              guest_name: data.guest_name,
+              vehicle_name: data.vehicles?.name,
+            },
       });
     }
 

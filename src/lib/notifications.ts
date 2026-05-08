@@ -6,6 +6,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { sendSms } from "./sms";
+import { FEATURE_FLAGS } from "./feature-flags";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -61,6 +62,12 @@ function buildMessage(template: string, reservation: ReservationInfo): string {
  * 최종 승인 완료 시 → 예약자에게 SMS
  */
 export async function notifyUserApproved(reservation: ReservationInfo) {
+  // Feature flag: SMS 잠금 시 알림 함수 진입 자체를 막음 (이중 안전장치)
+  if (!FEATURE_FLAGS.SMS_ENABLED) {
+    console.log("[SMS] FEATURE_FLAGS.SMS_ENABLED=false - 알림 발송 건너뜀");
+    return;
+  }
+
   console.log("[SMS] notifyUserApproved 호출:", reservation.guest_name, reservation.phone);
 
   if (!reservation.phone) {

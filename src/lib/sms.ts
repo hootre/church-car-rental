@@ -6,6 +6,7 @@
 
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
+import { FEATURE_FLAGS } from "./feature-flags";
 
 const COOLSMS_API_URL = "https://api.coolsms.co.kr/messages/v4/send-many/detail";
 
@@ -107,6 +108,12 @@ async function logSmsSent(messages: SmsMessage[]) {
 }
 
 export async function sendSms(messages: SmsMessage[]): Promise<SmsResult> {
+  // Feature flag: SMS 기능 잠금 시 발송 자체를 차단
+  if (!FEATURE_FLAGS.SMS_ENABLED) {
+    console.log("[SMS] FEATURE_FLAGS.SMS_ENABLED=false - 발송 건너뜀");
+    return { success: false, error: "SMS 기능 비활성화", skipped: true };
+  }
+
   const apiKey = process.env.COOLSMS_API_KEY;
   const apiSecret = process.env.COOLSMS_API_SECRET;
   const sender = process.env.COOLSMS_SENDER;

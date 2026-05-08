@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import StatusBadge from "@/components/StatusBadge";
 import PhotoUpload from "@/components/PhotoUpload";
 import {
-  supabase, Reservation, Admin, statusLabel, statusColor,
+  supabase, Reservation, Admin, Vehicle, statusLabel, statusColor,
   statusTransitions, statusRequiredRole,
 } from "@/lib/supabase";
 
@@ -14,19 +14,59 @@ interface Props {
   adminRole: string;
 }
 
+// 한국시간 기준 "YYYY-MM-DD HH:MM:SS" 비교용 문자열
+function nowParts() {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+  const timeStr = now.toLocaleTimeString("en-GB", {
+    timeZone: "Asia/Seoul",
+    hour12: false,
+  }); // "HH:MM:SS"
+  return { dateStr, timeStr };
+}
+
+// 현재 시각이 [start, end] 구간에 들어 있는지 (date+time 모두 비교)
+function isWithinPeriod(r: Reservation): boolean {
+  const { dateStr, timeStr } = nowParts();
+  const startedAlready =
+    r.start_date < dateStr ||
+    (r.start_date === dateStr && (r.start_time || "00:00:00") <= timeStr);
+  const notEndedYet =
+    r.end_date > dateStr ||
+    (r.end_date === dateStr && (r.end_time || "23:59:59") >= timeStr);
+  return startedAlready && notEndedYet;
+}
+
 export default function ReservationStatus({ adminId, adminRole }: Props) {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [actionNote, setActionNote] = useState("");
 
-  // 관리자 목록 조회
+  // 편집 모드 상태
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState({
+    vehicle_id: "",
+    start_date: "",
+    start_time: "",
+    end_date: "",
+    end_time: "",
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // 관리자 / 차량 목록 조회
   useEffect(() => {
     supabase.from("admins").select("*").then(({ data }) => {
       setAdmins(data || []);
     });
+    supabase
+      .from("vehicles")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .then(({ data }) => setVehicles(data || []));
   }, []);
 
   // 관리자 이름 찾기
@@ -56,20 +96,62 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
     setLoading(false);
     if (error) {
       toast.error("예약 목록을 불러오지 못했습니다");
-    } else {
-      const filtered = (data || []).filter((r) => r.status !== "cancelled");
-      const sorted = filtered.sort((a, b) => {
-        const diff = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
-        if (diff !== 0) return diff;
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      });
-      setReservations(sorted);
+      return null;
     }
+    const filtered = (data || []).filter((r) => r.status !== "cancelled");
+    const sorted = filtered.sort((a, b) => {
+      const diff = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
+      if (diff !== 0) return diff;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+    setReservations(sorted);
+    return sorted;
   }, []);
 
+  // approved 상태이면서 현재 시각이 사용 기간 안인 예약을 in_use 로 자동 전환
+  const syncInUseStatus = useCallback(
+    async (rows: Reservation[]) => {
+      const targets = rows.filter(
+        (r) => r.status === "approved" && isWithinPeriod(r)
+      );
+      if (targets.length === 0) return false;
+
+      const nowIso = new Date().toISOString();
+      const updates = await Promise.all(
+        targets.map((r) =>
+          supabase
+            .from("reservations")
+            .update({ status: "in_use", picked_up_at: r.picked_up_at || nowIso })
+            .eq("id", r.id)
+            .eq("status", "approved") // 동시 변경 방지
+        )
+      );
+      const changed = updates.filter((u) => !u.error).length;
+      if (changed > 0) {
+        toast.success(`${changed}건이 자동으로 '대여중'으로 전환되었습니다`);
+      }
+      return changed > 0;
+    },
+    []
+  );
+
   useEffect(() => {
-    fetchReservations();
-  }, [fetchReservations]);
+    (async () => {
+      const rows = await fetchReservations();
+      if (rows) {
+        const didSync = await syncInUseStatus(rows);
+        if (didSync) {
+          // 동기화 후 최신 데이터로 다시 로드
+          await fetchReservations();
+        }
+      }
+    })();
+  }, [fetchReservations, syncInUseStatus]);
+
+  // 선택된 예약이 바뀌면 편집모드 초기화
+  useEffect(() => {
+    setEditMode(false);
+  }, [selectedReservation?.id]);
 
   // 상태별 통계
   const stats = {
@@ -149,7 +231,7 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
     // 확인 팝업
     const confirmMessages: Record<string, string> = {
       staff_approved: `"${reservation.guest_name}"님의 예약을 1차 승인하시겠습니까?`,
-      approved: `"${reservation.guest_name}"님의 예약을 최종 승인하시겠습니까?\n(승인 시 신청자에게 SMS가 발송됩니다)`,
+      approved: `"${reservation.guest_name}"님의 예약을 최종 승인하시겠습니까?`,
       rejected: `"${reservation.guest_name}"님의 예약을 거절하시겠습니까?`,
       in_use: `"${reservation.guest_name}"님의 대여를 시작하시겠습니까?`,
       returned: `"${reservation.guest_name}"님의 반납을 완료 처리하시겠습니까?`,
@@ -181,6 +263,74 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
     } catch {
       toast.error("서버 오류가 발생했습니다");
     }
+  }
+
+  // 편집 모드 진입
+  function startEdit(r: Reservation) {
+    setEditForm({
+      vehicle_id: r.vehicle_id,
+      start_date: r.start_date,
+      start_time: (r.start_time || "").slice(0, 5),
+      end_date: r.end_date,
+      end_time: (r.end_time || "").slice(0, 5),
+    });
+    setEditMode(true);
+  }
+
+  function cancelEdit() {
+    setEditMode(false);
+  }
+
+  // 편집 저장
+  async function saveEdit(r: Reservation) {
+    // 유효성 검사
+    if (
+      !editForm.vehicle_id ||
+      !editForm.start_date ||
+      !editForm.start_time ||
+      !editForm.end_date ||
+      !editForm.end_time
+    ) {
+      toast.error("모든 항목을 입력해 주세요");
+      return;
+    }
+    if (
+      editForm.end_date < editForm.start_date ||
+      (editForm.end_date === editForm.start_date &&
+        editForm.end_time <= editForm.start_time)
+    ) {
+      toast.error("반납일시는 대여일시 이후여야 합니다");
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      const res = await fetch("/api/reservations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: r.id,
+          admin_id: adminId,
+          vehicle_id: editForm.vehicle_id,
+          start_date: editForm.start_date,
+          start_time: editForm.start_time + ":00",
+          end_date: editForm.end_date,
+          end_time: editForm.end_time + ":00",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "수정에 실패했습니다");
+      } else {
+        toast.success("수정되었습니다");
+        setEditMode(false);
+        setSelectedReservation(null);
+        fetchReservations();
+      }
+    } catch {
+      toast.error("서버 오류가 발생했습니다");
+    }
+    setSavingEdit(false);
   }
 
   // 예약 삭제 (최고관리자만 - API 경유)
@@ -310,7 +460,7 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
         return (
           <div
             className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
-            onClick={() => { setSelectedReservation(null); setActionNote(""); }}
+            onClick={() => { setSelectedReservation(null); setActionNote(""); setEditMode(false); }}
           >
             <div className="absolute inset-0 bg-black/50" />
             <div
@@ -328,7 +478,7 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
                 <div className="flex items-center gap-2">
                   <StatusBadge status={r.status} />
                   <button
-                    onClick={() => { setSelectedReservation(null); setActionNote(""); }}
+                    onClick={() => { setSelectedReservation(null); setActionNote(""); setEditMode(false); }}
                     className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                   >
                     <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -353,13 +503,121 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
 
                 {/* 사용 일정 */}
                 <div>
-                  <h4 className="text-xs font-semibold text-gray-400 mb-2">사용 일정</h4>
-                  <div className="bg-gray-50 rounded-xl p-3 space-y-2 text-sm">
-                    <DetailRow label="대여" value={`${r.start_date} ${r.start_time?.slice(0, 5)}`} />
-                    <DetailRow label="반납" value={`${r.end_date} ${r.end_time?.slice(0, 5)}`} />
-                    {r.destination && <DetailRow label="행선지" value={r.destination} />}
-                    {r.purpose && <DetailRow label="사용목적" value={r.purpose} />}
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-semibold text-gray-400">사용 일정 / 차량</h4>
+                    {!editMode ? (
+                      <button
+                        onClick={() => startEdit(r)}
+                        className="text-[11px] font-medium text-primary-600 hover:text-primary-700 px-2 py-0.5 rounded-md hover:bg-primary-50 transition-colors"
+                      >
+                        ✏ 수정
+                      </button>
+                    ) : (
+                      <button
+                        onClick={cancelEdit}
+                        className="text-[11px] font-medium text-gray-500 hover:text-gray-700 px-2 py-0.5 rounded-md hover:bg-gray-100 transition-colors"
+                      >
+                        취소
+                      </button>
+                    )}
                   </div>
+
+                  {!editMode ? (
+                    <div className="bg-gray-50 rounded-xl p-3 space-y-2 text-sm">
+                      <DetailRow label="차량" value={`${r.vehicles?.name || "-"}${r.vehicles?.plate_number ? ` (${r.vehicles.plate_number})` : ""}`} />
+                      <DetailRow label="대여" value={`${r.start_date} ${r.start_time?.slice(0, 5)}`} />
+                      <DetailRow label="반납" value={`${r.end_date} ${r.end_time?.slice(0, 5)}`} />
+                      {r.destination && <DetailRow label="행선지" value={r.destination} />}
+                      {r.purpose && <DetailRow label="사용목적" value={r.purpose} />}
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 rounded-xl p-3 space-y-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">차량 *</label>
+                        <select
+                          value={editForm.vehicle_id}
+                          onChange={(e) =>
+                            setEditForm((p) => ({ ...p, vehicle_id: e.target.value }))
+                          }
+                          className="input-field !py-2 text-sm"
+                        >
+                          {vehicles.map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {v.name}
+                              {v.plate_number ? ` (${v.plate_number})` : ""}
+                              {v.available ? "" : " · 사용불가"}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">대여일 *</label>
+                          <input
+                            type="date"
+                            value={editForm.start_date}
+                            onChange={(e) =>
+                              setEditForm((p) => ({ ...p, start_date: e.target.value }))
+                            }
+                            className="input-field !py-2 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">대여시간 *</label>
+                          <input
+                            type="time"
+                            value={editForm.start_time}
+                            onChange={(e) =>
+                              setEditForm((p) => ({ ...p, start_time: e.target.value }))
+                            }
+                            className="input-field !py-2 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">반납일 *</label>
+                          <input
+                            type="date"
+                            value={editForm.end_date}
+                            min={editForm.start_date}
+                            onChange={(e) =>
+                              setEditForm((p) => ({ ...p, end_date: e.target.value }))
+                            }
+                            className="input-field !py-2 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">반납시간 *</label>
+                          <input
+                            type="time"
+                            value={editForm.end_time}
+                            onChange={(e) =>
+                              setEditForm((p) => ({ ...p, end_time: e.target.value }))
+                            }
+                            className="input-field !py-2 text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={cancelEdit}
+                          className="flex-1 py-2 px-3 rounded-xl text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-100"
+                        >
+                          취소
+                        </button>
+
+                        <button
+                          onClick={() => saveEdit(r)}
+                          disabled={savingEdit}
+                          className="flex-1 py-2 px-3 rounded-xl text-xs font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:bg-gray-300"
+                        >
+                          {savingEdit ? "저장 중..." : "저장"}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-gray-400">
+                        ※ 차량 중복 예약 검사는 수행하지 않습니다. 일정 충돌 여부는 캘린더에서 확인해 주세요.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* 승인 현황 */}
