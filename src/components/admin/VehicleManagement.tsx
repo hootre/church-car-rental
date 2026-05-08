@@ -215,13 +215,55 @@ interface VehicleCardProps {
 
 function formatInsuranceExpiry(dateStr: string | null | undefined): { text: string; isUrgent: boolean; isExpired: boolean } {
   if (!dateStr || !dateStr.trim()) return { text: "미등록", isUrgent: false, isExpired: false };
-  // YYYY-MM-DD 형식 직접 파싱 (Date 생성자 timezone 이슈 방지)
-  const parts = dateStr.split("-");
-  if (parts.length !== 3) return { text: dateStr, isUrgent: false, isExpired: false };
-  const year = parseInt(parts[0], 10);
-  const month = parseInt(parts[1], 10);
-  const day = parseInt(parts[2], 10);
-  if (isNaN(year) || isNaN(month) || isNaN(day)) return { text: dateStr, isUrgent: false, isExpired: false };
+
+  // 다양한 날짜 형식 지원
+  const trimmed = dateStr.trim();
+  let year: number, month: number, day: number;
+
+  if (trimmed.includes("-")) {
+    const parts = trimmed.split("-");
+    if (parts.length === 3) {
+      year = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10);
+      day = parseInt(parts[2], 10);
+    } else if (parts.length === 2) {
+      // MM-DD 형식 → 올해 기준
+      year = new Date().getFullYear();
+      month = parseInt(parts[0], 10);
+      day = parseInt(parts[1], 10);
+    } else {
+      return { text: trimmed, isUrgent: false, isExpired: false };
+    }
+  } else if (trimmed.includes("/")) {
+    const parts = trimmed.split("/");
+    if (parts.length === 3) {
+      year = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10);
+      day = parseInt(parts[2], 10);
+    } else {
+      return { text: trimmed, isUrgent: false, isExpired: false };
+    }
+  } else if (trimmed.includes(".")) {
+    const parts = trimmed.split(".");
+    if (parts.length >= 3) {
+      year = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10);
+      day = parseInt(parts[2], 10);
+    } else {
+      return { text: trimmed, isUrgent: false, isExpired: false };
+    }
+  } else {
+    // ISO 문자열 등 fallback
+    const d = new Date(trimmed);
+    if (isNaN(d.getTime())) return { text: trimmed, isUrgent: false, isExpired: false };
+    year = d.getFullYear();
+    month = d.getMonth() + 1;
+    day = d.getDate();
+  }
+
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return { text: trimmed, isUrgent: false, isExpired: false };
+  // 2자리 연도 보정 (25 → 2025)
+  if (year < 100) year += 2000;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -789,13 +831,13 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
         </div>
         <button
           onClick={() => setSortMode(sortMode === "capacity" ? "insurance" : "capacity")}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 shadow-sm ${
             sortMode === "insurance"
-              ? "bg-orange-500 text-white"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-orange-200"
+              : "bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-teal-200 hover:shadow-md"
           }`}
         >
-          {sortMode === "insurance" ? "🛡️ 보험만기일순" : "보험만기일순"}
+          🛡️ {sortMode === "insurance" ? "보험만기일순" : "보험만기일순"}
         </button>
       </div>
 
