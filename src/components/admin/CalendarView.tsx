@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import toast from "react-hot-toast";
 import StatusBadge from "@/components/StatusBadge";
-import { supabase, Reservation, statusLabel, statusColor } from "@/lib/supabase";
+import { supabase, Reservation } from "@/lib/supabase";
 
 // 요일 이름
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -19,16 +19,21 @@ const dotColor: Record<string, string> = {
   cancelled: "bg-orange-300",
 };
 
-// 상태별 이벤트 바 색상 (데스크탑용 - 고채도)
-const barColor: Record<string, string> = {
-  pending: "bg-yellow-300 text-yellow-900",
-  staff_approved: "bg-emerald-300 text-emerald-900",
-  approved: "bg-green-400 text-green-900",
-  in_use: "bg-blue-300 text-blue-900",
-  returned: "bg-purple-300 text-purple-900",
-  rejected: "bg-red-300 text-red-900",
-  cancelled: "bg-orange-300 text-orange-900",
-};
+// 예약별 고유 색상 팔레트 (시각적으로 뚜렷하게 구분되는 색상들)
+const EVENT_PALETTE = [
+  { bar: "bg-blue-300 text-blue-900", dot: "bg-blue-400" },
+  { bar: "bg-emerald-300 text-emerald-900", dot: "bg-emerald-400" },
+  { bar: "bg-orange-300 text-orange-900", dot: "bg-orange-400" },
+  { bar: "bg-purple-300 text-purple-900", dot: "bg-purple-400" },
+  { bar: "bg-pink-300 text-pink-900", dot: "bg-pink-400" },
+  { bar: "bg-cyan-300 text-cyan-900", dot: "bg-cyan-400" },
+  { bar: "bg-amber-300 text-amber-900", dot: "bg-amber-400" },
+  { bar: "bg-rose-300 text-rose-900", dot: "bg-rose-400" },
+  { bar: "bg-teal-300 text-teal-900", dot: "bg-teal-400" },
+  { bar: "bg-indigo-300 text-indigo-900", dot: "bg-indigo-400" },
+  { bar: "bg-lime-300 text-lime-900", dot: "bg-lime-400" },
+  { bar: "bg-fuchsia-300 text-fuchsia-900", dot: "bg-fuchsia-400" },
+];
 
 interface EventBar {
   id: string;
@@ -103,6 +108,61 @@ export default function CalendarView() {
 
     return map;
   }, [reservations]);
+
+  // 예약별 고유 색상 할당 (같은 날 + 인접일 색 안 겹치게, 연박은 동일 색 유지)
+  const reservationColorMap = useMemo(() => {
+    const colorMap: Record<string, number> = {};
+    const resArray = reservations;
+    if (resArray.length === 0) return colorMap;
+
+    // 충돌 그래프: 같은 날 또는 인접일(±1일)에 있는 예약끼리 연결
+    const neighbors: Record<string, Set<string>> = {};
+    resArray.forEach((r) => {
+      neighbors[r.id] = new Set();
+    });
+
+    for (let i = 0; i < resArray.length; i++) {
+      const a = resArray[i];
+      const aStart = new Date(a.start_date + "T00:00:00").getTime();
+      const aEnd = new Date(a.end_date + "T00:00:00").getTime();
+      const DAY = 86400000;
+
+      for (let j = i + 1; j < resArray.length; j++) {
+        const b = resArray[j];
+        const bStart = new Date(b.start_date + "T00:00:00").getTime();
+        const bEnd = new Date(b.end_date + "T00:00:00").getTime();
+
+        // 인접일(±1)까지 포함하여 겹침 체크
+        if (aStart - DAY <= bEnd && bStart - DAY <= aEnd) {
+          neighbors[a.id].add(b.id);
+          neighbors[b.id].add(a.id);
+        }
+      }
+    }
+
+    // 탐욕적 그래프 컬러링 (이웃 많은 것부터)
+    const sorted = [...resArray].sort(
+      (a, b) => (neighbors[b.id]?.size || 0) - (neighbors[a.id]?.size || 0)
+    );
+
+    sorted.forEach((r) => {
+      const usedColors = new Set<number>();
+      neighbors[r.id]?.forEach((nId) => {
+        if (colorMap[nId] !== undefined) usedColors.add(colorMap[nId]);
+      });
+      let c = 0;
+      while (usedColors.has(c)) c++;
+      colorMap[r.id] = c;
+    });
+
+    return colorMap;
+  }, [reservations]);
+
+  // 예약 ID로 색상 가져오기 헬퍼
+  function getEventColor(reservationId: string) {
+    const idx = reservationColorMap[reservationId] ?? 0;
+    return EVENT_PALETTE[idx % EVENT_PALETTE.length];
+  }
 
   // 달력 날짜 그리드 생성
   const calendarDays = useMemo(() => {
@@ -283,15 +343,8 @@ export default function CalendarView() {
         </div>
       </div>
 
-      {/* 범례 */}
-      <div className="flex flex-wrap gap-2 mb-3">
-        {Object.entries(statusLabel).filter(([key]) => key !== "cancelled").map(([key, label]) => (
-          <div key={key} className="flex items-center gap-1">
-            <div className={`w-2 h-2 rounded-full ${dotColor[key]}`} />
-            <span className="text-[10px] text-gray-500">{label}</span>
-          </div>
-        ))}
-      </div>
+      {/* 안내 */}
+      <p className="text-[10px] text-gray-400 mb-3">* 색상은 예약별로 자동 배정됩니다 (같은 색 = 같은 예약)</p>
 
       {/* 달력 그리드 */}
       <div className="card !p-0 mb-4 overflow-hidden">
@@ -361,13 +414,13 @@ export default function CalendarView() {
                                 dayReservations.map((r, i) => (
                                   <div
                                     key={i}
-                                    className={`w-[5px] h-[5px] rounded-full ${dotColor[r.status] || "bg-gray-300"}`}
+                                    className={`w-[5px] h-[5px] rounded-full ${getEventColor(r.id).dot}`}
                                   />
                                 ))
                               ) : (
                                 <>
-                                  <div className={`w-[5px] h-[5px] rounded-full ${dotColor[dayReservations[0].status]}`} />
-                                  <div className={`w-[5px] h-[5px] rounded-full ${dotColor[dayReservations[1].status]}`} />
+                                  <div className={`w-[5px] h-[5px] rounded-full ${getEventColor(dayReservations[0].id).dot}`} />
+                                  <div className={`w-[5px] h-[5px] rounded-full ${getEventColor(dayReservations[1].id).dot}`} />
                                   <span
                                     className="text-[8px] text-primary-500 font-bold leading-none"
                                     onClick={(e) => {
@@ -434,7 +487,7 @@ export default function CalendarView() {
                                 onClick={() => setPopupReservation(bar.reservation)}
                                 className={`absolute h-[22px] flex items-center px-2 text-[11px] font-medium truncate
                                   cursor-pointer hover:opacity-80 active:opacity-60 transition-opacity
-                                  ${barColor[bar.reservation.status] || "bg-gray-300 text-gray-700"}
+                                  ${getEventColor(bar.reservation.id).bar}
                                   ${roundedClass}
                                 `}
                                 style={{
