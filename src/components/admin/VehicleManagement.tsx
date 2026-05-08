@@ -957,7 +957,19 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
                           <p className="text-xs text-gray-400 mb-1">현재 보험</p>
                           <InfoRow label="보험사" value={selectedVehicle.insurance_company || "-"} />
                           <InfoRow label="사고접수" value={selectedVehicle.insurance_phone || "-"} />
-                          <InfoRow label="만기일" value={selectedVehicle.insurance_expiry || "-"} />
+                          {(() => {
+                            const ins = formatInsuranceExpiry(selectedVehicle.insurance_expiry);
+                            return (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-500">만기일</span>
+                                <span className={`font-medium ${
+                                  ins.isExpired ? "text-red-600 font-bold" : ins.isUrgent ? "text-orange-600 font-bold" : "text-gray-900"
+                                }`}>
+                                  {ins.text}{ins.isExpired ? " (만료됨)" : ins.isUrgent ? " (곧 만료)" : ""}
+                                </span>
+                              </div>
+                            );
+                          })()}
                           <InfoRow
                             label="설계사"
                             value={`${selectedVehicle.insurance_agent || "-"} (${selectedVehicle.insurance_agent_phone || "-"})`}
