@@ -6,8 +6,19 @@ import StatusBadge from "@/components/StatusBadge";
 import PhotoUpload from "@/components/PhotoUpload";
 import {
   supabase, Reservation, Admin, Vehicle, statusLabel, statusColor,
-  statusTransitions, statusRequiredRole,
+  statusRequiredRole,
 } from "@/lib/supabase";
+
+// 관리자 모달의 "상태 직접 변경" select 에 노출할 후보 상태 목록
+const ALL_STATUSES: { value: string; label: string }[] = [
+  { value: "pending", label: "대기중" },
+  { value: "staff_approved", label: "차량담당 장로 승인" },
+  { value: "approved", label: "승인완료" },
+  { value: "in_use", label: "대여중" },
+  { value: "returned", label: "반납완료" },
+  { value: "rejected", label: "거절" },
+  { value: "cancelled", label: "예약취소" },
+];
 
 interface Props {
   adminId: string;
@@ -45,6 +56,8 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
   const [filter, setFilter] = useState("all");
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [actionNote, setActionNote] = useState("");
+  // 자유 상태 변경 select 의 현재 선택값
+  const [pickedStatus, setPickedStatus] = useState<string>("");
 
   // 편집 모드 상태
   const [editMode, setEditMode] = useState(false);
@@ -148,9 +161,11 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
     })();
   }, [fetchReservations, syncInUseStatus]);
 
-  // 선택된 예약이 바뀌면 편집모드 초기화
+  // 선택된 예약이 바뀌면 편집모드 / 선택 상태 초기화
   useEffect(() => {
     setEditMode(false);
+    setPickedStatus("");
+    setActionNote("");
   }, [selectedReservation?.id]);
 
   // 상태별 통계
@@ -229,21 +244,9 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
     }
 
     // 확인 팝업
-    const isReverting =
-      (reservation.status === "in_use" && nextStatus === "approved") ||
-      (reservation.status === "returned" && nextStatus === "approved") ||
-      (reservation.status === "returned" && nextStatus === "in_use");
-
-    const confirmMessages: Record<string, string> = {
-      staff_approved: `"${reservation.guest_name}"님의 예약을 1차 승인하시겠습니까?`,
-      approved: `"${reservation.guest_name}"님의 예약을 최종 승인하시겠습니까?`,
-      rejected: `"${reservation.guest_name}"님의 예약을 거절하시겠습니까?`,
-      in_use: `"${reservation.guest_name}"님의 대여를 시작하시겠습니까?`,
-      returned: `"${reservation.guest_name}"님의 반납을 완료 처리하시겠습니까?`,
-    };
-    const msg = isReverting
-      ? `"${reservation.guest_name}"님의 예약 상태를 "${statusLabel[nextStatus]}"(으)로 되돌리시겠습니까?`
-      : confirmMessages[nextStatus] || `상태를 "${statusLabel[nextStatus]}"(으)로 변경하시겠습니까?`;
+    const fromLabel = statusLabel[reservation.status] || reservation.status;
+    const toLabel = statusLabel[nextStatus] || nextStatus;
+    const msg = `"${reservation.guest_name}"님의 예약 상태를\n[${fromLabel}] → [${toLabel}](으)로 변경하시겠습니까?`;
     if (!confirm(msg)) return;
 
     try {
@@ -373,36 +376,7 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
     }
   }
 
-  // 상태 변경 버튼의 라벨과 색상
-  // 되돌리기(역방향) 케이스는 amber 색상으로 명확히 구분
-  function getActionButton(currentStatus: string, nextStatus: string) {
-    // 되돌리기 케이스
-    if (currentStatus === "in_use" && nextStatus === "approved") {
-      return { label: "↩ 승인 상태로 되돌리기", color: "bg-amber-500 hover:bg-amber-600" };
-    }
-    if (currentStatus === "returned" && nextStatus === "approved") {
-      return { label: "↩ 승인 상태로 되돌리기", color: "bg-amber-500 hover:bg-amber-600" };
-    }
-    if (currentStatus === "returned" && nextStatus === "in_use") {
-      return { label: "↩ 대여중으로 되돌리기", color: "bg-amber-500 hover:bg-amber-600" };
-    }
-
-    // 정방향
-    switch (nextStatus) {
-      case "staff_approved":
-        return { label: "차량담당 장로 승인", color: "bg-emerald-500 hover:bg-emerald-600" };
-      case "approved":
-        return { label: "기획장로 승인", color: "bg-green-500 hover:bg-green-600" };
-      case "rejected":
-        return { label: "거절", color: "bg-red-500 hover:bg-red-600" };
-      case "in_use":
-        return { label: "대여 시작", color: "bg-blue-500 hover:bg-blue-600" };
-      case "returned":
-        return { label: "반납 완료", color: "bg-purple-500 hover:bg-purple-600" };
-      default:
-        return { label: nextStatus, color: "bg-gray-500" };
-    }
-  }
+  // (자유 상태 변경 select 도입으로 정방향 버튼 매핑은 제거)
 
   return (
     <div>
@@ -475,7 +449,6 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
       {/* ===== 상세보기 팝업 ===== */}
       {selectedReservation && (() => {
         const r = selectedReservation;
-        const transitions = statusTransitions[r.status] || [];
 
         return (
           <div
@@ -718,46 +691,47 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
                   </div>
                 )}
 
-                {/* 상태 변경 액션 */}
-                {transitions.length > 0 && (
-                  <div className="space-y-2 pt-2 border-t border-gray-100">
-                    <textarea
-                      value={actionNote}
-                      onChange={(e) => setActionNote(e.target.value)}
-                      placeholder="관리자 메모 (선택)"
-                      rows={2}
-                      className="input-field text-xs resize-none"
-                    />
-                    <div className="flex gap-2">
-                      {transitions.map((next) => {
-                        const btn = getActionButton(r.status, next);
-                        const allowed = canTransition(next);
+                {/* 상태 변경 (자유 변경) */}
+                <div className="space-y-2 pt-3 border-t border-gray-100">
+                  <p className="text-xs font-semibold text-gray-400">상태 변경</p>
+                  <textarea
+                    value={actionNote}
+                    onChange={(e) => setActionNote(e.target.value)}
+                    placeholder="관리자 메모 (선택)"
+                    rows={2}
+                    className="input-field text-xs resize-none"
+                  />
+                  <div className="flex gap-2">
+                    <select
+                      value={pickedStatus}
+                      onChange={(e) => setPickedStatus(e.target.value)}
+                      className="input-field !py-2 text-sm flex-1"
+                    >
+                      <option value="">변경할 상태 선택...</option>
+                      {ALL_STATUSES.filter((s) => s.value !== r.status).map((s) => {
+                        const allowed = canTransition(s.value);
                         return (
-                          <button
-                            key={next}
-                            onClick={() => handleStatusChange(r, next)}
-                            disabled={!allowed}
-                            className={`flex-1 py-2.5 px-3 rounded-xl text-white text-xs font-medium
-                              ${allowed ? btn.color : "bg-gray-300 cursor-not-allowed"}`}
-                            title={!allowed ? "이 작업은 권한이 없습니다" : ""}
-                          >
-                            {btn.label}
-                            {!allowed && " 🔒"}
-                          </button>
+                          <option key={s.value} value={s.value} disabled={!allowed}>
+                            {s.label}
+                            {!allowed ? " (권한 없음)" : ""}
+                          </option>
                         );
                       })}
-                    </div>
-                    {!canTransition(transitions[0]) && (
-                      <p className="text-[10px] text-gray-400 text-center">
-                        {adminRole === "member"
-                          ? "부원은 승인 권한이 없습니다 (조회만 가능)"
-                          : adminRole === "staff" && transitions.includes("approved")
-                          ? "기획장로 승인은 기획장로 권한이 필요합니다"
-                          : "이 단계의 승인 권한이 없습니다"}
-                      </p>
-                    )}
+                    </select>
+                    <button
+                      onClick={() => handleStatusChange(r, pickedStatus)}
+                      disabled={!pickedStatus || !canTransition(pickedStatus)}
+                      className="px-4 py-2 rounded-xl text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      변경
+                    </button>
                   </div>
-                )}
+                  {adminRole === "member" && (
+                    <p className="text-[10px] text-gray-400 text-center">
+                      부원은 일부 상태(대여중/반납완료)로만 변경할 수 있습니다
+                    </p>
+                  )}
+                </div>
 
                 {/* 최고관리자 삭제 버튼 */}
                 {adminRole === "super_admin" && (
