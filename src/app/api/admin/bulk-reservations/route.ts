@@ -16,10 +16,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 차량 목록 조회
-    const { data: vehicles } = await supabase.from("vehicles").select("id, name");
-    if (!vehicles) {
+    const { data: vehicleData } = await supabase.from("vehicles").select("id, name");
+    if (!vehicleData || vehicleData.length === 0) {
       return NextResponse.json({ error: "차량 목록 조회 실패" }, { status: 500 });
     }
+    const vehicles = vehicleData;
 
     // 차량명 매칭 함수
     function findVehicle(keyword: string) {
