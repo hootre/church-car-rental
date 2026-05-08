@@ -36,15 +36,18 @@ export const statusColor: Record<string, string> = {
 };
 
 // 상태 전이 규칙
-// pending → staff_approved (차량담당 장로 승인) → approved (기획장로 승인) → in_use → returned
+// 정방향:  pending -> staff_approved -> approved -> in_use -> returned
+// 되돌리기: 관리자가 잘못 눌렀을 때 한 단계(또는 두 단계) 되돌릴 수 있도록 허용
+//   - in_use   -> approved          (대여 시작 취소)
+//   - returned -> approved | in_use (반납 처리 취소 / 대여중으로 복귀)
 export const statusTransitions: Record<string, string[]> = {
   pending: ["staff_approved", "rejected"],
   staff_approved: ["approved", "rejected"],
   approved: ["in_use", "rejected"],
-  in_use: ["returned"],
+  in_use: ["returned", "approved"],
   rejected: [],
   cancelled: [],
-  returned: [],
+  returned: ["approved", "in_use"],
 };
 
 // 상태 변경 시 필요한 역할

@@ -229,6 +229,11 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
     }
 
     // 확인 팝업
+    const isReverting =
+      (reservation.status === "in_use" && nextStatus === "approved") ||
+      (reservation.status === "returned" && nextStatus === "approved") ||
+      (reservation.status === "returned" && nextStatus === "in_use");
+
     const confirmMessages: Record<string, string> = {
       staff_approved: `"${reservation.guest_name}"님의 예약을 1차 승인하시겠습니까?`,
       approved: `"${reservation.guest_name}"님의 예약을 최종 승인하시겠습니까?`,
@@ -236,7 +241,9 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
       in_use: `"${reservation.guest_name}"님의 대여를 시작하시겠습니까?`,
       returned: `"${reservation.guest_name}"님의 반납을 완료 처리하시겠습니까?`,
     };
-    const msg = confirmMessages[nextStatus] || `상태를 "${statusLabel[nextStatus]}"(으)로 변경하시겠습니까?`;
+    const msg = isReverting
+      ? `"${reservation.guest_name}"님의 예약 상태를 "${statusLabel[nextStatus]}"(으)로 되돌리시겠습니까?`
+      : confirmMessages[nextStatus] || `상태를 "${statusLabel[nextStatus]}"(으)로 변경하시겠습니까?`;
     if (!confirm(msg)) return;
 
     try {
@@ -367,8 +374,21 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
   }
 
   // 상태 변경 버튼의 라벨과 색상
-  function getActionButton(status: string) {
-    switch (status) {
+  // 되돌리기(역방향) 케이스는 amber 색상으로 명확히 구분
+  function getActionButton(currentStatus: string, nextStatus: string) {
+    // 되돌리기 케이스
+    if (currentStatus === "in_use" && nextStatus === "approved") {
+      return { label: "↩ 승인 상태로 되돌리기", color: "bg-amber-500 hover:bg-amber-600" };
+    }
+    if (currentStatus === "returned" && nextStatus === "approved") {
+      return { label: "↩ 승인 상태로 되돌리기", color: "bg-amber-500 hover:bg-amber-600" };
+    }
+    if (currentStatus === "returned" && nextStatus === "in_use") {
+      return { label: "↩ 대여중으로 되돌리기", color: "bg-amber-500 hover:bg-amber-600" };
+    }
+
+    // 정방향
+    switch (nextStatus) {
       case "staff_approved":
         return { label: "차량담당 장로 승인", color: "bg-emerald-500 hover:bg-emerald-600" };
       case "approved":
@@ -380,7 +400,7 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
       case "returned":
         return { label: "반납 완료", color: "bg-purple-500 hover:bg-purple-600" };
       default:
-        return { label: status, color: "bg-gray-500" };
+        return { label: nextStatus, color: "bg-gray-500" };
     }
   }
 
@@ -710,7 +730,7 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
                     />
                     <div className="flex gap-2">
                       {transitions.map((next) => {
-                        const btn = getActionButton(next);
+                        const btn = getActionButton(r.status, next);
                         const allowed = canTransition(next);
                         return (
                           <button
