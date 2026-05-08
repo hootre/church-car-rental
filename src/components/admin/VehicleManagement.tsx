@@ -305,8 +305,6 @@ function VehicleCard({ v, status, onLoadDetail, onToggleAvailable }: VehicleCard
         </span>
         {insurance.isExpired && " ⚠️ 만료됨"}
         {insurance.isUrgent && " ⚠️ 곧 만료"}
-        {/* 디버그: DB 원본값 확인용 (확인 후 삭제) */}
-        <span className="text-[9px] text-gray-300 ml-1">[{v.insurance_expiry}]</span>
       </p>
     </div>
   );
