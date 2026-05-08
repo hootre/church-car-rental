@@ -684,7 +684,11 @@ export default function CalendarView() {
           ) : (
             <div className="space-y-2">
               {selectedReservations.map((r) => (
-                <div key={r.id} className="card !p-3">
+                <button
+                  key={r.id}
+                  onClick={() => setPopupReservation(r)}
+                  className="card !p-3 w-full text-left hover:bg-gray-50 active:scale-[0.98] transition-all"
+                >
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2">
                       <div className={`w-2 h-2 rounded-full ${dotColor[r.status]}`} />
@@ -692,7 +696,12 @@ export default function CalendarView() {
                         {r.vehicles?.name}
                       </h5>
                     </div>
-                    <StatusBadge status={r.status} />
+                    <div className="flex items-center gap-1.5">
+                      <StatusBadge status={r.status} />
+                      <svg className="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
                   </div>
                   <div className="space-y-0.5 text-xs text-gray-500">
                     <div className="flex justify-between">
@@ -724,7 +733,7 @@ export default function CalendarView() {
                       <span className="text-gray-900">{r.phone}</span>
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}

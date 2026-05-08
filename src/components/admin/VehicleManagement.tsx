@@ -305,6 +305,8 @@ function VehicleCard({ v, status, onLoadDetail, onToggleAvailable }: VehicleCard
         </span>
         {insurance.isExpired && " ⚠️ 만료됨"}
         {insurance.isUrgent && " ⚠️ 곧 만료"}
+        {/* 디버그: DB 원본값 확인용 (확인 후 삭제) */}
+        <span className="text-[9px] text-gray-300 ml-1">[{v.insurance_expiry}]</span>
       </p>
     </div>
   );
@@ -867,11 +869,11 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
         >
           <div className="absolute inset-0 bg-black/50" />
           <div
-            className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[90vh] sm:max-h-[85vh] overflow-y-auto shadow-2xl"
+            className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg h-[85vh] sm:h-[80vh] flex flex-col shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 팝업 헤더 */}
-            <div className="sticky top-0 bg-white rounded-t-2xl border-b border-gray-100 px-4 py-3 flex items-center justify-between z-10">
+            <div className="shrink-0 bg-white rounded-t-2xl border-b border-gray-100 px-4 py-3 flex items-center justify-between z-10">
               <div className="flex items-center gap-2.5 min-w-0">
                 <span className="text-2xl shrink-0">
                   {selectedVehicle.type === "bus"
@@ -914,7 +916,7 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
             </div>
 
             {/* 탭 */}
-            <div className="px-4 pt-3">
+            <div className="shrink-0 px-4 pt-3 pb-1">
               <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
                 {(
                   [
@@ -941,7 +943,7 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
             </div>
 
             {/* 탭 컨텐츠 */}
-            <div className="px-4 py-4">
+            <div className="flex-1 overflow-y-auto px-4 py-4">
               {loadingDetail ? (
                 <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
               ) : (
