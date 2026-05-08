@@ -214,64 +214,27 @@ interface VehicleCardProps {
 }
 
 function formatInsuranceExpiry(dateStr: string | null | undefined): { text: string; isUrgent: boolean; isExpired: boolean } {
-  if (!dateStr || !dateStr.trim()) return { text: "미등록", isUrgent: false, isExpired: false };
+  if (!dateStr || !String(dateStr).trim()) return { text: "미등록", isUrgent: false, isExpired: false };
 
-  // 다양한 날짜 형식 지원
-  const trimmed = dateStr.trim();
-  let year: number, month: number, day: number;
+  // Date 객체로 변환 (timezone 이슈 방지를 위해 T12:00:00 추가)
+  const raw = String(dateStr).trim();
+  const d = new Date(raw.length === 10 ? raw + "T12:00:00" : raw);
 
-  if (trimmed.includes("-")) {
-    const parts = trimmed.split("-");
-    if (parts.length === 3) {
-      year = parseInt(parts[0], 10);
-      month = parseInt(parts[1], 10);
-      day = parseInt(parts[2], 10);
-    } else if (parts.length === 2) {
-      // MM-DD 형식 → 올해 기준
-      year = new Date().getFullYear();
-      month = parseInt(parts[0], 10);
-      day = parseInt(parts[1], 10);
-    } else {
-      return { text: trimmed, isUrgent: false, isExpired: false };
-    }
-  } else if (trimmed.includes("/")) {
-    const parts = trimmed.split("/");
-    if (parts.length === 3) {
-      year = parseInt(parts[0], 10);
-      month = parseInt(parts[1], 10);
-      day = parseInt(parts[2], 10);
-    } else {
-      return { text: trimmed, isUrgent: false, isExpired: false };
-    }
-  } else if (trimmed.includes(".")) {
-    const parts = trimmed.split(".");
-    if (parts.length >= 3) {
-      year = parseInt(parts[0], 10);
-      month = parseInt(parts[1], 10);
-      day = parseInt(parts[2], 10);
-    } else {
-      return { text: trimmed, isUrgent: false, isExpired: false };
-    }
-  } else {
-    // ISO 문자열 등 fallback
-    const d = new Date(trimmed);
-    if (isNaN(d.getTime())) return { text: trimmed, isUrgent: false, isExpired: false };
-    year = d.getFullYear();
-    month = d.getMonth() + 1;
-    day = d.getDate();
+  if (isNaN(d.getTime())) {
+    // 파싱 실패 시 원본 표시
+    return { text: raw, isUrgent: false, isExpired: false };
   }
 
-  if (isNaN(year) || isNaN(month) || isNaN(day)) return { text: trimmed, isUrgent: false, isExpired: false };
-  // 2자리 연도 보정 (25 → 2025)
-  if (year < 100) year += 2000;
+  const year = d.getFullYear();
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const expiry = new Date(year, month - 1, day);
-  const diffDays = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  const formatted = `${year}년 ${String(month).padStart(2, "0")}월 ${String(day).padStart(2, "0")}일`;
+  const diffDays = Math.ceil((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
   return {
-    text: formatted,
+    text: `${year}년 ${month}월 ${day}일`,
     isUrgent: diffDays <= 30 && diffDays > 0,
     isExpired: diffDays <= 0,
   };
@@ -322,27 +285,27 @@ function VehicleCard({ v, status, onLoadDetail, onToggleAvailable }: VehicleCard
           )}
         </div>
       </div>
-      {/* 보험 만기일 - 상태 아래 강조 표시 */}
-      <div className={`mt-1.5 text-[11px] font-semibold flex items-center gap-1 ${
+      {/* 보험 만기일 */}
+      <p className={`mt-1.5 text-[11px] font-semibold ${
         insurance.isExpired
           ? "text-red-600"
           : insurance.isUrgent
             ? "text-orange-600"
             : "text-gray-500"
       }`}>
-        <span>🛡️ 보험 만기:</span>
-        <span className={`${
+        {"🛡️ 보험 만기: "}
+        <span className={
           insurance.isExpired
-            ? "bg-red-100 text-red-700 px-1.5 py-0.5 rounded"
+            ? "bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold"
             : insurance.isUrgent
-              ? "bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded"
+              ? "bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-bold"
               : ""
-        }`}>
-          {v.insurance_expiry ? insurance.text : "미등록"}
+        }>
+          {insurance.text}
         </span>
-        {insurance.isExpired && <span className="text-red-600 font-bold">만료됨</span>}
-        {insurance.isUrgent && <span className="text-orange-600 font-bold">곧 만료</span>}
-      </div>
+        {insurance.isExpired && " ⚠️ 만료됨"}
+        {insurance.isUrgent && " ⚠️ 곧 만료"}
+      </p>
     </div>
   );
 }
