@@ -87,42 +87,48 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
       ? reservations
       : reservations.filter((r) => r.status === filter);
 
-  // 오늘 날짜 (YYYY-MM-DD)
-  const todayStr = new Date().toISOString().slice(0, 10);
+  // 오늘 날짜 (YYYY-MM-DD, 한국시간 기준)
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
 
   // 오늘 해당 항목: 오늘이 대여기간에 포함되는 예약
   const todayItems = filtered.filter((r) => r.start_date <= todayStr && r.end_date >= todayStr);
   const todayIds = new Set(todayItems.map((r) => r.id));
 
-  // 나머지 항목을 월별 그룹핑
+  // 나머지 항목을 주별 그룹핑
   const restItems = filtered.filter((r) => !todayIds.has(r.id));
 
-  // 월별 아코디언
-  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set());
+  // 주별 아코디언
+  const [collapsedWeeks, setCollapsedWeeks] = useState<Set<string>>(new Set());
 
-  function groupByMonth(items: Reservation[]): { key: string; label: string; items: Reservation[] }[] {
+  function groupByWeek(items: Reservation[]): { key: string; label: string; items: Reservation[] }[] {
     const groups: Record<string, Reservation[]> = {};
     for (const r of items) {
-      const date = new Date(r.start_date || r.created_at);
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      const date = new Date((r.start_date || r.created_at) + "T00:00:00");
+      const day = date.getDay(); // 0=일
+      const sun = new Date(date);
+      sun.setDate(date.getDate() - day);
+      const key = sun.toLocaleDateString("en-CA");
       if (!groups[key]) groups[key] = [];
       groups[key].push(r);
     }
     return Object.entries(groups)
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([key, items]) => {
-        const [year, month] = key.split("-");
-        return { key, label: `${year}년 ${parseInt(month)}월`, items };
+        const sun = new Date(key + "T00:00:00");
+        const sat = new Date(sun);
+        sat.setDate(sun.getDate() + 6);
+        const label = `${sun.getMonth() + 1}/${sun.getDate()} ~ ${sat.getMonth() + 1}/${sat.getDate()}`;
+        return { key, label, items };
       });
   }
 
-  const monthlyGroups = groupByMonth(restItems);
+  const weeklyGroups = groupByWeek(restItems);
 
-  function toggleMonth(monthKey: string) {
-    setCollapsedMonths((prev) => {
+  function toggleWeek(weekKey: string) {
+    setCollapsedWeeks((prev) => {
       const next = new Set(prev);
-      if (next.has(monthKey)) next.delete(monthKey);
-      else next.add(monthKey);
+      if (next.has(weekKey)) next.delete(weekKey);
+      else next.add(weekKey);
       return next;
     });
   }
@@ -263,13 +269,13 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
             </div>
           )}
 
-          {/* 월별 아코디언 */}
-          {monthlyGroups.map((group) => {
-            const isCollapsed = collapsedMonths.has(group.key);
+          {/* 주별 아코디언 */}
+          {weeklyGroups.map((group) => {
+            const isCollapsed = collapsedWeeks.has(group.key);
             return (
               <div key={group.key} className="rounded-2xl overflow-hidden border border-gray-200 bg-white">
                 <button
-                  onClick={() => toggleMonth(group.key)}
+                  onClick={() => toggleWeek(group.key)}
                   className="w-full flex items-center justify-between px-4 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors"
                 >
                   <div className="flex items-center gap-2">

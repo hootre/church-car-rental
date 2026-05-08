@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import Header from "@/components/Header";
 import StatusBadge from "@/components/StatusBadge";
 import PhotoUpload from "@/components/PhotoUpload";
-import { supabase, Reservation, ReservationPhoto } from "@/lib/supabase";
+import { supabase, Reservation } from "@/lib/supabase";
 
 export default function CheckPage() {
   const [phone, setPhone] = useState("");
@@ -45,60 +45,6 @@ export default function CheckPage() {
       return;
     }
     fetchReservations();
-  }
-
-  // 대여 시작 (approved → in_use)
-  async function handlePickup(reservation: Reservation) {
-    const photos = (reservation.reservation_photos || []).filter(
-      (p) => p.photo_type === "pickup"
-    );
-    if (photos.length === 0) {
-      toast.error("대여 시 차량 사진을 최소 1장 이상 등록해 주세요");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("reservations")
-      .update({
-        status: "in_use",
-        picked_up_at: new Date().toISOString(),
-      })
-      .eq("id", reservation.id);
-
-    if (error) {
-      toast.error("상태 변경에 실패했습니다");
-    } else {
-      toast.success("대여가 시작되었습니다. 안전운행 하세요!");
-      setSelectedReservation(null);
-      fetchReservations();
-    }
-  }
-
-  // 반납 완료 (in_use → returned)
-  async function handleReturn(reservation: Reservation) {
-    const photos = (reservation.reservation_photos || []).filter(
-      (p) => p.photo_type === "return"
-    );
-    if (photos.length === 0) {
-      toast.error("반납 시 차량 사진을 최소 1장 이상 등록해 주세요");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("reservations")
-      .update({
-        status: "returned",
-        returned_at: new Date().toISOString(),
-      })
-      .eq("id", reservation.id);
-
-    if (error) {
-      toast.error("상태 변경에 실패했습니다");
-    } else {
-      toast.success("반납이 완료되었습니다. 감사합니다!");
-      setSelectedReservation(null);
-      fetchReservations();
-    }
   }
 
   // 예약 취소 (pending, staff_approved만 가능)
@@ -348,51 +294,22 @@ export default function CheckPage() {
                   </button>
                 )}
 
-                {/* ===== 승인됨: 대여 사진 업로드 + 대여 시작 ===== */}
+                {/* ===== 승인됨: 관리자가 대여/반납 처리 안내 ===== */}
                 {r.status === "approved" && (
-                  <div className="space-y-3">
-                    <PhotoUpload
-                      reservationId={r.id}
-                      photoType="pickup"
-                      existingPhotos={pickupPhotos}
-                      onUploadComplete={fetchReservations}
-                    />
-                    <button
-                      onClick={() => handlePickup(r)}
-                      className="w-full py-3 bg-blue-500 text-white font-semibold rounded-xl
-                                 hover:bg-blue-600 active:bg-blue-700 transition-colors"
-                    >
-                      🚗 대여 시작
-                    </button>
+                  <div className="p-3 bg-green-50 rounded-xl text-center">
+                    <p className="text-sm text-green-700 font-medium">승인완료 - 대여 시 관리자에게 문의하세요</p>
                   </div>
                 )}
 
-                {/* ===== 대여중: 반납 사진 업로드 + 반납 완료 ===== */}
+                {/* ===== 대여중 ===== */}
                 {r.status === "in_use" && (
                   <div className="space-y-3">
+                    <div className="p-3 bg-blue-50 rounded-xl text-center">
+                      <p className="text-sm text-blue-700 font-medium">대여중 - 반납 시 관리자에게 문의하세요</p>
+                    </div>
                     {pickupPhotos.length > 0 && (
-                      <div className="opacity-70">
-                        <PhotoUpload
-                          reservationId={r.id}
-                          photoType="pickup"
-                          existingPhotos={pickupPhotos}
-                          readOnly
-                        />
-                      </div>
+                      <PhotoUpload reservationId={r.id} photoType="pickup" existingPhotos={pickupPhotos} readOnly />
                     )}
-                    <PhotoUpload
-                      reservationId={r.id}
-                      photoType="return"
-                      existingPhotos={returnPhotos}
-                      onUploadComplete={fetchReservations}
-                    />
-                    <button
-                      onClick={() => handleReturn(r)}
-                      className="w-full py-3 bg-purple-500 text-white font-semibold rounded-xl
-                                 hover:bg-purple-600 active:bg-purple-700 transition-colors"
-                    >
-                      🔑 반납 완료
-                    </button>
                   </div>
                 )}
 
@@ -400,20 +317,10 @@ export default function CheckPage() {
                 {r.status === "returned" && (
                   <div className="space-y-3">
                     {pickupPhotos.length > 0 && (
-                      <PhotoUpload
-                        reservationId={r.id}
-                        photoType="pickup"
-                        existingPhotos={pickupPhotos}
-                        readOnly
-                      />
+                      <PhotoUpload reservationId={r.id} photoType="pickup" existingPhotos={pickupPhotos} readOnly />
                     )}
                     {returnPhotos.length > 0 && (
-                      <PhotoUpload
-                        reservationId={r.id}
-                        photoType="return"
-                        existingPhotos={returnPhotos}
-                        readOnly
-                      />
+                      <PhotoUpload reservationId={r.id} photoType="return" existingPhotos={returnPhotos} readOnly />
                     )}
                   </div>
                 )}

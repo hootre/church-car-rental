@@ -103,7 +103,7 @@ function VehicleForm({ form, setForm, onSubmit, submitLabel, onCancel }: Vehicle
             className="input-field !py-2 text-sm"
           >
             <option value="shared">공유차량</option>
-            <option value="personal">개인차량</option>
+            <option value="personal">별도관리차량</option>
           </select>
         </div>
         <div>
@@ -831,12 +831,12 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
             )}
           </div>
 
-          {/* 개인차량 섹션 */}
+          {/* 별도관리차량 섹션 */}
           {personalVehicles.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div className="flex items-center gap-1.5">
-                  <h4 className="font-bold text-sm text-gray-900">개인차량</h4>
+                  <h4 className="font-bold text-sm text-gray-900">별도관리차량</h4>
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
                     비공유
                   </span>

@@ -8,6 +8,7 @@ import { supabase, Reservation } from "@/lib/supabase";
 // 요일 이름
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
+
 // 상태별 캘린더 도트 색상
 const dotColor: Record<string, string> = {
   pending: "bg-yellow-400",
@@ -68,8 +69,8 @@ export default function CalendarView() {
     const calEnd = new Date(endOfMonth);
     calEnd.setDate(calEnd.getDate() + (6 - endOfMonth.getDay()));
 
-    const startStr = calStart.toISOString().split("T")[0];
-    const endStr = calEnd.toISOString().split("T")[0];
+    const startStr = calStart.toLocaleDateString("en-CA");
+    const endStr = calEnd.toLocaleDateString("en-CA");
 
     const { data, error } = await supabase
       .from("reservations")
@@ -100,7 +101,7 @@ export default function CalendarView() {
       const end = new Date(r.end_date + "T00:00:00");
 
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        const key = d.toISOString().split("T")[0];
+        const key = d.toLocaleDateString("en-CA");
         if (!map[key]) map[key] = [];
         map[key].push(r);
       }
@@ -203,7 +204,7 @@ export default function CalendarView() {
       const intersecting: Reservation[] = [];
 
       weekDays.forEach((day) => {
-        const dateStr = day.date.toISOString().split("T")[0];
+        const dateStr = day.date.toLocaleDateString("en-CA");
         const dayRes = reservationsByDate[dateStr] || [];
         dayRes.forEach((r) => {
           if (!seen.has(r.id)) {
@@ -295,11 +296,11 @@ export default function CalendarView() {
 
   function goToToday() {
     setCurrentDate(new Date());
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
     setSelectedDate(today);
   }
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
 
   const selectedReservations = selectedDate
     ? reservationsByDate[selectedDate] || []
@@ -379,7 +380,7 @@ export default function CalendarView() {
                   <div className="grid grid-cols-7">
                     {weekDays.map((dayInfo, colIdx) => {
                       const { date, isCurrentMonth } = dayInfo;
-                      const dateStr = date.toISOString().split("T")[0];
+                      const dateStr = date.toLocaleDateString("en-CA");
                       const dayReservations = reservationsByDate[dateStr] || [];
                       const isToday = dateStr === todayStr;
                       const isSelected = dateStr === selectedDate;
@@ -445,7 +446,7 @@ export default function CalendarView() {
                     // = 해당 날짜 총 예약 수 - 해당 열에서 보이는 바(lane<3) 수
                     const overflowByCol: number[] = [0, 0, 0, 0, 0, 0, 0];
                     weekDays.forEach((dayInfo, col) => {
-                      const dateStr = dayInfo.date.toISOString().split("T")[0];
+                      const dateStr = dayInfo.date.toLocaleDateString("en-CA");
                       const totalForDay = (reservationsByDate[dateStr] || []).length;
                       const visibleForCol = bars.filter(
                         (bar) => bar.lane < 3 && bar.startCol <= col && bar.endCol >= col
@@ -504,7 +505,7 @@ export default function CalendarView() {
                         {/* 열별 +더보기 버튼 */}
                         {overflowByCol.map((count, col) => {
                           if (count === 0) return null;
-                          const colDateStr = weekDays[col].date.toISOString().split("T")[0];
+                          const colDateStr = weekDays[col].date.toLocaleDateString("en-CA");
                           return (
                             <button
                               key={`more-${col}`}

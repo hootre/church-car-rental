@@ -35,7 +35,7 @@ export default function ReservePage() {
   >({});
 
   useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
     setForm((prev) => ({ ...prev, start_date: today, end_date: today }));
   }, []);
 
@@ -206,7 +206,7 @@ export default function ReservePage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">사용 시작일 *</label>
                   <input type="date" name="start_date" value={form.start_date} onChange={handleInput}
-                    min={new Date().toISOString().split("T")[0]} className="input-field" />
+                    min={new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" })} className="input-field" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">시작 시간 *</label>

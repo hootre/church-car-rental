@@ -114,8 +114,8 @@ export default function ReservationHistory({ adminRole, adminId }: Props) {
     }
   });
 
-  // 오늘 날짜
-  const todayStr = new Date().toISOString().slice(0, 10);
+  // 오늘 날짜 (한국시간 기준)
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
 
   // 오늘 해당 항목
   const todayItems = sorted.filter((r) => r.start_date <= todayStr && r.end_date >= todayStr);

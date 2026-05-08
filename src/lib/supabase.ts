@@ -56,8 +56,8 @@ export const statusRequiredRole: Record<string, string[]> = {
   staff_approved: ["staff", "manager", "emergency", "super_admin"],
   approved: ["manager", "emergency", "super_admin"],
   rejected: ["staff", "manager", "emergency", "super_admin"],
-  in_use: ["staff", "manager", "emergency", "super_admin"],
-  returned: ["staff", "manager", "emergency", "super_admin"],
+  in_use: ["staff", "manager", "emergency", "super_admin", "member"],
+  returned: ["staff", "manager", "emergency", "super_admin", "member"],
 };
 
 // 타입 정의
@@ -83,7 +83,7 @@ export interface Vehicle {
 // 차량 분류 한글 매핑
 export const categoryLabel: Record<string, string> = {
   shared: "공유차량",
-  personal: "개인차량",
+  personal: "별도관리차량",
 };
 
 export interface VehicleInsurance {
