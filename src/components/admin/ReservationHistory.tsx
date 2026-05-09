@@ -135,10 +135,17 @@ export default function ReservationHistory({ adminRole, adminId }: Props) {
       groups[key].push(r);
     }
     return Object.entries(groups)
+      // 월 그룹은 최신 달이 위 (desc)
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([key, items]) => {
         const [year, month] = key.split("-");
-        return { key, label: `${year}년 ${parseInt(month)}월`, items };
+        // 월 안에서는 1일 → 30일 순 (start_date + start_time asc)
+        const sortedItems = [...items].sort((a, b) => {
+          const aKey = `${a.start_date} ${a.start_time || "00:00:00"}`;
+          const bKey = `${b.start_date} ${b.start_time || "00:00:00"}`;
+          return aKey.localeCompare(bKey);
+        });
+        return { key, label: `${year}년 ${parseInt(month)}월`, items: sortedItems };
       });
   }
 
