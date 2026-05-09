@@ -324,6 +324,8 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
   const [detailTab, setDetailTab] = useState<DetailTab>("info");
   const [filterType, setFilterType] = useState("all");
   const [sortMode, setSortMode] = useState<"capacity" | "insurance">("capacity");
+  // 통계 카드(사용가능/사용중/사용불가) 클릭으로 필터링
+  const [statusFilter, setStatusFilter] = useState<"all" | VehicleStatus>("all");
 
   // 현재 사용중인 차량 ID 목록
   const [inUseVehicleIds, setInUseVehicleIds] = useState<Set<string>>(new Set());
@@ -699,14 +701,18 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
     return (b.capacity || 0) - (a.capacity || 0);
   };
   const typeFilter = (v: Vehicle) => filterType === "all" || v.type === filterType;
+  const statusFilterFn = (v: Vehicle) =>
+    statusFilter === "all" || getVehicleStatus(v) === statusFilter;
 
   const sharedVehicles = vehicles
     .filter((v) => (v.category || "shared") === "shared")
     .filter(typeFilter)
+    .filter(statusFilterFn)
     .sort(sortFn);
   const personalVehicles = vehicles
     .filter((v) => v.category === "personal")
     .filter(typeFilter)
+    .filter(statusFilterFn)
     .sort(sortFn);
 
   const typeFilters: { key: string; label: string }[] = [
@@ -760,20 +766,38 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
         </>
       )}
 
-      {/* 상태 요약 */}
+      {/* 상태 요약 (카드 클릭 = 필터 토글) */}
       <div className="grid grid-cols-3 gap-2 mb-4">
-        <div className="bg-green-50 rounded-xl p-2.5 text-center">
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === "available" ? "all" : "available")}
+          className={`bg-green-50 rounded-xl p-2.5 text-center transition-all ${
+            statusFilter === "available" ? "ring-2 ring-offset-1 ring-green-500" : "hover:bg-green-100"
+          }`}
+        >
           <div className="text-lg font-bold text-green-700">{statusCounts.available}</div>
-          <div className="text-[10px] text-green-600">사용가능</div>
-        </div>
-        <div className="bg-blue-50 rounded-xl p-2.5 text-center">
+          <div className="text-[10px] text-green-600 font-medium">사용가능</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === "in_use" ? "all" : "in_use")}
+          className={`bg-blue-50 rounded-xl p-2.5 text-center transition-all ${
+            statusFilter === "in_use" ? "ring-2 ring-offset-1 ring-blue-500" : "hover:bg-blue-100"
+          }`}
+        >
           <div className="text-lg font-bold text-blue-700">{statusCounts.in_use}</div>
-          <div className="text-[10px] text-blue-600">사용중</div>
-        </div>
-        <div className="bg-red-50 rounded-xl p-2.5 text-center">
+          <div className="text-[10px] text-blue-600 font-medium">사용중</div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === "unavailable" ? "all" : "unavailable")}
+          className={`bg-red-50 rounded-xl p-2.5 text-center transition-all ${
+            statusFilter === "unavailable" ? "ring-2 ring-offset-1 ring-red-500" : "hover:bg-red-100"
+          }`}
+        >
           <div className="text-lg font-bold text-red-700">{statusCounts.unavailable}</div>
-          <div className="text-[10px] text-red-600">사용불가</div>
-        </div>
+          <div className="text-[10px] text-red-600 font-medium">사용불가</div>
+        </button>
       </div>
 
       {/* 차종 필터 + 정렬 */}

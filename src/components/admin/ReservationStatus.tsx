@@ -39,15 +39,7 @@ function isWithinPeriod(r: Reservation): boolean {
   return startedAlready && notEndedYet;
 }
 
-const statusOrder: Record<string, number> = {
-  pending: 0,
-  staff_approved: 1,
-  approved: 2,
-  in_use: 3,
-  returned: 4,
-  cancelled: 5,
-  rejected: 6,
-};
+// (정렬 키는 사용 일정 시간순으로 단순화 — 아래 fetchReservations 내부에서 적용)
 
 export default function ReservationStatus({ adminId, adminRole }: Props) {
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -84,10 +76,11 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
       return null;
     }
     const filtered = (data || []).filter((r) => r.status !== "cancelled");
+    // 시간순 정렬 (start_date + start_time 기준 최신 일정이 위)
     const sorted = filtered.sort((a, b) => {
-      const diff = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
-      if (diff !== 0) return diff;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      const aKey = `${a.start_date} ${a.start_time || "00:00:00"}`;
+      const bKey = `${b.start_date} ${b.start_time || "00:00:00"}`;
+      return bKey.localeCompare(aKey);
     });
     setReservations(sorted);
     return sorted;
