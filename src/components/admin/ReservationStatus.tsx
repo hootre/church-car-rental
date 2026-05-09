@@ -75,12 +75,19 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
       toast.error("예약 목록을 불러오지 못했습니다");
       return null;
     }
-    const filtered = (data || []).filter((r) => r.status !== "cancelled");
-    // 시간순 정렬 (start_date + start_time 기준 최신 일정이 위)
+    // 한국시간 기준 오늘 (YYYY-MM-DD)
+    const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+
+    // 1) cancelled 제외, 2) 오늘 이후만 (end_date >= today)
+    const filtered = (data || []).filter(
+      (r) => r.status !== "cancelled" && r.end_date >= todayStr
+    );
+
+    // 시간순 정렬 (start_date + start_time 기준 가까운 일정이 위)
     const sorted = filtered.sort((a, b) => {
       const aKey = `${a.start_date} ${a.start_time || "00:00:00"}`;
       const bKey = `${b.start_date} ${b.start_time || "00:00:00"}`;
-      return bKey.localeCompare(aKey);
+      return aKey.localeCompare(bKey);
     });
     setReservations(sorted);
     return sorted;
@@ -156,7 +163,8 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
       groups[key].push(r);
     }
     return Object.entries(groups)
-      .sort(([a], [b]) => b.localeCompare(a))
+      // 가까운 주(일요일 날짜가 빠른 것)부터 위
+      .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, items]) => {
         const sun = new Date(key + "T00:00:00");
         const sat = new Date(sun);
