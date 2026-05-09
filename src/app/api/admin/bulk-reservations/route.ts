@@ -1,3 +1,7 @@
+// =====================================================
+// 일괄 예약 등록 엔드포인트
+// 현재 UI 에서는 호출하지 않음 (외부 스크립트/마이그레이션 용도로만 보존)
+// =====================================================
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 

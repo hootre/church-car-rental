@@ -131,12 +131,13 @@ export default function ReservationDetailModal({
         end_date: editForm.end_date,
         end_time: editForm.end_time + ":00",
       };
+      // 상태가 바뀌면 status 와 함께 admin_note 도 보냄
       if (statusChanged) {
         body.status = editForm.status;
+      }
+      // 메모는 항상 본문에 포함 (status 변경 여부와 무관하게 저장 가능하도록)
+      if (editForm.admin_note !== (r.admin_note || "")) {
         body.admin_note = editForm.admin_note;
-      } else if (editForm.admin_note !== (r.admin_note || "")) {
-        // 메모만 변경된 경우 — 별도 처리는 안 함 (status 가 있어야 admin_note 가 PATCH 본문에 들어가도록 라우트가 설계돼 있음)
-        // 향후 필요 시 라우트 확장
       }
 
       const res = await fetch("/api/reservations", {

@@ -35,22 +35,9 @@ export const statusColor: Record<string, string> = {
   returned: "bg-purple-100 text-purple-800",
 };
 
-// 상태 전이 규칙
-// 정방향:  pending -> staff_approved -> approved -> in_use -> returned
-// 되돌리기: 관리자가 잘못 눌렀을 때 한 단계(또는 두 단계) 되돌릴 수 있도록 허용
-//   - in_use   -> approved          (대여 시작 취소)
-//   - returned -> approved | in_use (반납 처리 취소 / 대여중으로 복귀)
-export const statusTransitions: Record<string, string[]> = {
-  pending: ["staff_approved", "rejected"],
-  staff_approved: ["approved", "rejected"],
-  approved: ["in_use", "rejected"],
-  in_use: ["returned", "approved"],
-  rejected: [],
-  cancelled: [],
-  returned: ["approved", "in_use"],
-};
-
 // 상태 변경 시 필요한 역할
+// (※ 자유 변경 도입으로 statusTransitions 는 제거됨 — 모든 상태 ↔ 모든 상태 가능,
+//    실제 권한은 아래 statusRequiredRole 로만 제어)
 // staff(차량담당 장로): 1차 승인, manager(기획장로): 2차(최종) 승인
 // emergency(긴급승인자): 1차+2차 모두 가능
 // member(부원): 승인 권한 없음 (조회만)

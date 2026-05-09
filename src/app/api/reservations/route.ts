@@ -137,10 +137,14 @@ export async function PATCH(request: NextRequest) {
     // 업데이트 데이터 구성
     const updateData: Record<string, unknown> = {};
 
+    // (0) 메모는 status 변경 여부와 무관하게 받음
+    if (typeof admin_note === "string") {
+      updateData.admin_note = admin_note || null;
+    }
+
     // (1) 상태 전이
     if (status) {
       updateData.status = status;
-      updateData.admin_note = admin_note || null;
 
       // 담당 승인 시
       if (status === "staff_approved" && admin_id) {

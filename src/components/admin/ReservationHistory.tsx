@@ -49,12 +49,6 @@ export default function ReservationHistory({ adminRole, adminId }: Props) {
     fetchMeta();
   }, []);
 
-  function getAdminName(adminId: string | null): string {
-    if (!adminId) return "-";
-    const admin = admins.find((a) => a.id === adminId);
-    return admin ? admin.name : "-";
-  }
-
   const statusOrder: Record<string, number> = {
     pending: 0, staff_approved: 1, approved: 2, in_use: 3,
     returned: 4, cancelled: 5, rejected: 6,
