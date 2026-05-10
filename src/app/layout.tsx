@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import ToasterProvider from "@/components/ToasterProvider";
 import PWARegister from "@/components/PWARegister";
+import { ConfirmProvider } from "@/components/ConfirmDialog";
 import "./globals.css";
 
 const churchName = "한국중앙교회";
@@ -103,7 +104,7 @@ export default function RootLayout({
         />
         <ToasterProvider />
         <PWARegister />
-        {children}
+        <ConfirmProvider>{children}</ConfirmProvider>
       </body>
     </html>
   );

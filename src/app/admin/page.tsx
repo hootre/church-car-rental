@@ -161,9 +161,6 @@ export default function AdminPage() {
             </button>
           </form>
 
-          <p className="mt-6 text-xs text-gray-400 text-center">
-            초기 계정: admin / admin1234
-          </p>
         </main>
       </div>
     );
@@ -199,28 +196,31 @@ export default function AdminPage() {
         </div>
 
         <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4 overflow-x-auto scrollbar-hide">
-          {visibleTabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 min-w-0 py-2 px-2 text-xs font-medium rounded-lg transition-all whitespace-nowrap text-center inline-flex items-center justify-center gap-1 ${
-                activeTab === tab.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <span>{tab.icon}</span>
-              <span className="truncate">{tab.label}</span>
-              {tab.key === "status" && pendingCount > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[14px] h-[14px] bg-yellow-400 text-yellow-900 text-[9px] font-bold rounded-full px-0.5 shrink-0">
-                  {pendingCount}
-                </span>
-              )}
-              {tab.key === "status" && staffApprovedCount > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[14px] h-[14px] bg-orange-500 text-white text-[9px] font-bold rounded-full px-0.5 shrink-0">
-                  {staffApprovedCount}
-                </span>
-              )}
-            </button>
-          ))}
+          {visibleTabs.map((tab) => {
+            // 현황 탭의 미처리 건수(1차 + 2차 대기) 합산 뱃지
+            const totalPending =
+              tab.key === "status" ? pendingCount + staffApprovedCount : 0;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`relative flex-1 min-w-0 py-2 px-2 text-xs font-medium rounded-lg transition-all whitespace-nowrap text-center inline-flex items-center justify-center gap-1 ${
+                  activeTab === tab.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <span>{tab.icon}</span>
+                <span className="truncate">{tab.label}</span>
+                {totalPending > 0 && (
+                  <span
+                    className="absolute top-0 right-0.5 inline-flex items-center justify-center min-w-[14px] h-[14px] bg-orange-500 text-white text-[9px] font-bold rounded-full px-1 shadow-sm leading-none"
+                    title={`1차 대기 ${pendingCount}건 + 2차 대기 ${staffApprovedCount}건`}
+                  >
+                    {totalPending}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {activeTab === "calendar" && <CalendarView />}

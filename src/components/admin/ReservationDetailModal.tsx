@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import StatusBadge from "@/components/StatusBadge";
 import PhotoUpload from "@/components/PhotoUpload";
+import { useConfirm } from "@/components/ConfirmDialog";
 import {
   Reservation,
   Vehicle,
@@ -51,6 +52,7 @@ export default function ReservationDetailModal({
   onClose,
   onUpdated,
 }: Props) {
+  const confirm = useConfirm();
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -120,6 +122,28 @@ export default function ReservationDetailModal({
       return;
     }
 
+    // 수정 전 확인
+    const summary: string[] = [];
+    if (editForm.vehicle_id !== r.vehicle_id) summary.push("• 차량 변경");
+    if (editForm.start_date !== r.start_date || editForm.start_time !== (r.start_time || "").slice(0, 5))
+      summary.push("• 대여일시 변경");
+    if (editForm.end_date !== r.end_date || editForm.end_time !== (r.end_time || "").slice(0, 5))
+      summary.push("• 반납일시 변경");
+    if (statusChanged)
+      summary.push(`• 상태: ${statusLabel[r.status] || r.status} → ${statusLabel[editForm.status] || editForm.status}`);
+    if (editForm.admin_note !== (r.admin_note || ""))
+      summary.push("• 관리자 메모 변경");
+
+    const ok = await confirm({
+      title: "예약 정보 수정",
+      message:
+        summary.length > 0
+          ? `다음 변경사항을 저장하시겠습니까?\n\n${summary.join("\n")}`
+          : "변경 사항이 없습니다. 그대로 저장하시겠습니까?",
+      confirmText: "저장",
+    });
+    if (!ok) return;
+
     setSaving(true);
     try {
       const body: Record<string, unknown> = {
@@ -165,7 +189,13 @@ export default function ReservationDetailModal({
       toast.error("최고관리자만 삭제할 수 있습니다");
       return;
     }
-    if (!confirm("이 예약을 완전히 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.")) return;
+    const ok = await confirm({
+      title: "예약 삭제",
+      message: `"${r.guest_name}"님의 예약을 완전히 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.`,
+      confirmText: "삭제",
+      variant: "danger",
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch("/api/reservations", {
