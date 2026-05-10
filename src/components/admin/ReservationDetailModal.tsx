@@ -94,6 +94,49 @@ export default function ReservationDetailModal({
     return required.includes(adminRole);
   }
 
+  // 현재 상태별 다음 정방향 액션 (빠른 승인 / 대여 시작 / 반납 완료)
+  function getQuickAction(): { next: string; label: string; cls: string } | null {
+    if (r.status === "pending") return { next: "staff_approved", label: "차량담당 장로 승인", cls: "bg-emerald-500 hover:bg-emerald-600" };
+    if (r.status === "staff_approved") return { next: "approved", label: "기획장로 최종 승인", cls: "bg-green-600 hover:bg-green-700" };
+    if (r.status === "approved") return { next: "in_use", label: "대여 시작", cls: "bg-blue-500 hover:bg-blue-600" };
+    if (r.status === "in_use") return { next: "returned", label: "반납 완료", cls: "bg-purple-500 hover:bg-purple-600" };
+    return null;
+  }
+
+  async function quickAdvance(nextStatus: string) {
+    if (!canTransition(nextStatus)) {
+      toast.error("이 작업의 권한이 없습니다");
+      return;
+    }
+    const ok = await confirm({
+      title: statusLabel[nextStatus] || "상태 변경",
+      message: '"' + r.guest_name + '"님의 상태를 "' + (statusLabel[nextStatus] || nextStatus) + '"(으)로 변경하시겠습니까?',
+      confirmText: "확인",
+    });
+    if (!ok) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch("/api/reservations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: r.id, admin_id: adminId, status: nextStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "변경에 실패했습니다");
+      } else {
+        toast.success("변경되었습니다");
+        onUpdated();
+        onClose();
+      }
+    } catch {
+      toast.error("서버 오류가 발생했습니다");
+    }
+    setSaving(false);
+  }
+
+
   async function saveEdit() {
     // 유효성 검사
     if (
@@ -261,6 +304,8 @@ ${hasPhotos ? `<div class="section"><div class="section-title">차량 사진</di
 
   const pickupPhotos = (r.reservation_photos || []).filter((p) => p.photo_type === "pickup");
   const returnPhotos = (r.reservation_photos || []).filter((p) => p.photo_type === "return");
+  const quickAction = getQuickAction();
+  const quickAllowed = quickAction !== null && canTransition(quickAction.next);
 
   return (
     <div
@@ -453,6 +498,19 @@ ${hasPhotos ? `<div class="section"><div class="section-title">차량 사진</di
             )}
           </div>
 
+          {/* 빠른 액션 (보기 모드 + 다음 단계 가능 시) */}
+          {!editMode && quickAction && (
+            <button
+              type="button"
+              onClick={() => quickAdvance(quickAction.next)}
+              disabled={!quickAllowed || saving}
+              title={!quickAllowed ? "이 작업의 권한이 없습니다" : ""}
+              className={"w-full py-3 rounded-xl text-sm font-bold text-white transition-colors shadow-sm " + (quickAllowed ? quickAction.cls : "bg-gray-300 cursor-not-allowed") + " disabled:opacity-60"}
+            >
+              {quickAllowed ? quickAction.label : quickAction.label + " 🔒"}
+            </button>
+          )}
+
           {/* 승인 현황 */}
           <div>
             <h4 className="text-xs font-semibold text-gray-400 mb-2">승인 현황</h4>
@@ -512,7 +570,7 @@ ${hasPhotos ? `<div class="section"><div class="section-title">차량 사진</di
           </p>
         </div>
 
-        {/* 푸터 */}
+        {/* 푸터 (보기 모드만) */}
         {!editMode && (
           <div className="sticky bottom-0 bg-white rounded-b-2xl border-t border-gray-100 px-4 py-3 flex gap-2 safe-area-bottom">
             <button
@@ -588,14 +646,14 @@ function ApprovalBlock({
   const textColor = color === "emerald" ? "text-emerald-600" : "text-green-600";
   return (
     <div className="flex-1 text-center">
-      <div className={`text-xs font-bold ${ok ? textColor : "text-gray-300"}`}>
+      <div className={"text-xs font-bold " + (ok ? textColor : "text-gray-300")}>
         {ok ? "✓ 승인" : "⏳ 대기"}
       </div>
       <div className="text-[10px] text-gray-400 mt-0.5">{title}</div>
       {ok && (
         <>
           {approverName && (
-            <div className={`text-[10px] font-medium ${textColor}`}>{approverName}</div>
+            <div className={"text-[10px] font-medium " + textColor}>{approverName}</div>
           )}
           <div className="text-[10px] text-gray-400">
             {new Date(approvedAt!).toLocaleDateString("ko-KR")}

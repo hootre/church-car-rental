@@ -433,8 +433,13 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
     const [insRes, maintRes, histRes] = await Promise.all([
       supabase.from("vehicle_insurance").select("*").eq("vehicle_id", vehicle.id).order("end_date", { ascending: false }),
       supabase.from("vehicle_maintenance").select("*").eq("vehicle_id", vehicle.id).order("maintenance_date", { ascending: false }),
-      // 사용기록 = 반납완료된 예약만
-      supabase.from("reservations").select("*").eq("vehicle_id", vehicle.id).eq("status", "returned").order("start_date", { ascending: false }),
+      // 사용기록 = 현재 사용중(in_use) + 반납완료(returned) 예약
+      supabase
+        .from("reservations")
+        .select("*")
+        .eq("vehicle_id", vehicle.id)
+        .in("status", ["in_use", "returned"])
+        .order("start_date", { ascending: false }),
     ]);
 
     setInsurances(insRes.data || []);
@@ -733,6 +738,10 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
   }
 
   const selectedStatus = selectedVehicle ? getVehicleStatus(selectedVehicle) : null;
+
+  // 사용기록 탭 — 현재 사용중 / 반납완료 분리 (컴포넌트 본문에서 미리 계산)
+  const inUseList = usageHistory.filter((r) => r.status === "in_use");
+  const returnedList = usageHistory.filter((r) => r.status === "returned");
   const selectedCfg = selectedStatus ? statusConfig[selectedStatus] : null;
 
   return (
@@ -1170,7 +1179,30 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
                   {/* ===== 사용기록 탭 ===== */}
                   {detailTab === "history" && (
                     <div>
-                      <p className="text-sm text-gray-500 mb-3">{usageHistory.length}건</p>
+                      {/* 현재 사용중 강조 */}
+                      {inUseList.length > 0 && (
+                        <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2">
+                          <span className="text-base">🚗</span>
+                          <div className="flex-1">
+                            <p className="text-xs font-bold text-blue-700">현재 사용중</p>
+                            <p className="text-[11px] text-blue-600 mt-0.5">
+                              {inUseList.map((r) => `${r.guest_name}(${r.department})`).join(", ")}
+                            </p>
+                          </div>
+                          <span className="bg-blue-500 text-white text-xs font-bold rounded-full px-2 py-0.5">
+                            {inUseList.length}
+                          </span>
+                        </div>
+                      )}
+
+                      <p className="text-sm text-gray-500 mb-3">
+                        총 {usageHistory.length}건
+                        {inUseList.length > 0 && returnedList.length > 0 && (
+                          <span className="text-gray-400">
+                            {" "}(사용중 {inUseList.length} · 반납완료 {returnedList.length})
+                          </span>
+                        )}
+                      </p>
 
                       {usageHistory.length === 0 ? (
                         <div className="text-center py-8 text-gray-400 text-sm">사용 기록이 없습니다</div>
