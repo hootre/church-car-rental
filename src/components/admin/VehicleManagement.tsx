@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
 import {
-  supabase, Vehicle, VehicleInsurance, VehicleMaintenance, Reservation,
-  vehicleTypeLabel, maintenanceTypeLabel, categoryLabel, statusLabel,
+  supabase, Vehicle, VehicleInsurance, VehicleMaintenance, Reservation, Admin,
+  vehicleTypeLabel, maintenanceTypeLabel, categoryLabel,
 } from "@/lib/supabase";
 import StatusBadge from "@/components/StatusBadge";
+import ReservationDetailModal from "@/components/admin/ReservationDetailModal";
 
 type DetailTab = "info" | "insurance" | "maintenance" | "history";
 type VehicleStatus = "available" | "in_use" | "unavailable";
@@ -329,6 +330,8 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
 
   // 현재 사용중인 차량 ID 목록
   const [inUseVehicleIds, setInUseVehicleIds] = useState<Set<string>>(new Set());
+  // 관리자 목록 (예약 상세 모달에 전달)
+  const [admins, setAdmins] = useState<Admin[]>([]);
 
   // 로그 기록 헬퍼
   async function logAction(action: string, targetType: string, targetId?: string, details?: Record<string, unknown>) {
@@ -415,6 +418,7 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
   useEffect(() => {
     fetchVehicles();
     fetchInUseVehicles();
+    supabase.from("admins").select("*").then(({ data }) => setAdmins(data || []));
   }, [fetchVehicles, fetchInUseVehicles]);
 
   function getVehicleStatus(vehicle: Vehicle): VehicleStatus {
@@ -1240,110 +1244,23 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
         </div>
       )}
 
-      {/* 사용기록 상세 팝업 (차량 상세 위에 표시) */}
+      {/* 공통 예약 상세 모달 (차량 상세 위에 표시) */}
       {selectedHistory && (
-        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center sm:p-4" onClick={() => setSelectedHistory(null)}>
-          <div className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
-            {/* 팝업 헤더 */}
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between rounded-t-2xl z-10">
-              <h3 className="font-bold text-gray-900">사용기록 상세</h3>
-              <button
-                onClick={() => setSelectedHistory(null)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* 팝업 내용 */}
-            <div className="px-4 py-4 space-y-4">
-              {/* 상태 */}
-              <div className="flex items-center gap-3">
-                <StatusBadge status={selectedHistory.status} />
-                <span className="text-sm text-gray-500">{statusLabel[selectedHistory.status]}</span>
-              </div>
-
-              {/* 기본 정보 */}
-              <div className="bg-gray-50 rounded-xl p-3 space-y-2">
-                <HistoryDetailRow label="신청자" value={`${selectedHistory.guest_name} (${selectedHistory.department})`} />
-                <HistoryDetailRow label="연락처" value={selectedHistory.phone} />
-                <HistoryDetailRow
-                  label="사용기간"
-                  value={
-                    selectedHistory.start_date === selectedHistory.end_date
-                      ? `${selectedHistory.start_date} ${selectedHistory.start_time?.slice(0, 5)} ~ ${selectedHistory.end_time?.slice(0, 5)}`
-                      : `${selectedHistory.start_date} ${selectedHistory.start_time?.slice(0, 5)} ~ ${selectedHistory.end_date} ${selectedHistory.end_time?.slice(0, 5)}`
-                  }
-                />
-                {selectedHistory.purpose && (
-                  <HistoryDetailRow label="사용목적" value={selectedHistory.purpose} />
-                )}
-                {selectedHistory.destination && (
-                  <HistoryDetailRow label="행선지" value={selectedHistory.destination} />
-                )}
-                {selectedHistory.passenger_count && (
-                  <HistoryDetailRow label="탑승인원" value={`${selectedHistory.passenger_count}명`} />
-                )}
-                {selectedHistory.driver_name && (
-                  <HistoryDetailRow label="운전자" value={selectedHistory.driver_name} />
-                )}
-              </div>
-
-              {/* 승인/처리 정보 */}
-              <div className="bg-gray-50 rounded-xl p-3 space-y-2">
-                <p className="text-xs font-medium text-gray-700 mb-1">처리 현황</p>
-                <HistoryDetailRow
-                  label="신청일"
-                  value={selectedHistory.created_at ? new Date(selectedHistory.created_at).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"}
-                />
-                {selectedHistory.staff_approved_at && (
-                  <HistoryDetailRow
-                    label="1차 승인"
-                    value={new Date(selectedHistory.staff_approved_at).toLocaleDateString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                  />
-                )}
-                {selectedHistory.manager_approved_at && (
-                  <HistoryDetailRow
-                    label="최종 승인"
-                    value={new Date(selectedHistory.manager_approved_at).toLocaleDateString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                  />
-                )}
-                {selectedHistory.picked_up_at && (
-                  <HistoryDetailRow
-                    label="대여 시작"
-                    value={new Date(selectedHistory.picked_up_at).toLocaleDateString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                  />
-                )}
-                {selectedHistory.returned_at && (
-                  <HistoryDetailRow
-                    label="반납 완료"
-                    value={new Date(selectedHistory.returned_at).toLocaleDateString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                  />
-                )}
-              </div>
-
-              {/* 관리자 메모 */}
-              {selectedHistory.admin_note && (
-                <div className="bg-yellow-50 rounded-xl p-3">
-                  <p className="text-xs font-medium text-yellow-700 mb-1">관리자 메모</p>
-                  <p className="text-sm text-yellow-800">{selectedHistory.admin_note}</p>
-                </div>
-              )}
-            </div>
-          </div>
+        <div className="relative z-[60]">
+          <ReservationDetailModal
+            reservation={selectedHistory}
+            adminId={adminId || ""}
+            adminRole={adminRole || ""}
+            vehicles={vehicles}
+            admins={admins}
+            onClose={() => setSelectedHistory(null)}
+            onUpdated={() => {
+              if (selectedVehicle) loadVehicleDetail(selectedVehicle);
+            }}
+          />
         </div>
       )}
     </div>
   );
 }
 
-function HistoryDetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between items-start gap-4">
-      <span className="text-xs text-gray-400 shrink-0">{label}</span>
-      <span className="text-xs text-gray-900 text-right">{value}</span>
-    </div>
-  );
-}

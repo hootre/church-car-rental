@@ -227,7 +227,7 @@ export default function AdminPage() {
           })}
         </div>
 
-        {activeTab === "calendar" && <CalendarView />}
+        {activeTab === "calendar" && adminSession && <CalendarView adminId={adminSession.id} adminRole={adminSession.role} />}
         {activeTab === "status" && adminSession && (
           <ReservationStatus adminId={adminSession.id} adminRole={adminSession.role} />
         )}

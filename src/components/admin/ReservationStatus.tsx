@@ -127,13 +127,15 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
     })();
   }, [fetchReservations, syncInUseStatus]);
 
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+
   // 통계
   const stats = {
     total: reservations.length,
     pending: reservations.filter((r) => r.status === "pending").length,
     staff_approved: reservations.filter((r) => r.status === "staff_approved").length,
     approved: reservations.filter((r) => r.status === "approved").length,
-    in_use: reservations.filter((r) => r.status === "in_use").length,
+    in_use: reservations.filter((r) => r.status === "in_use" && r.end_date >= todayStr).length,
     returned: reservations.filter((r) => r.status === "returned").length,
   };
 
@@ -142,7 +144,6 @@ export default function ReservationStatus({ adminId, adminRole }: Props) {
       ? reservations
       : reservations.filter((r) => r.status === filter);
 
-  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
   const todayItems = filtered.filter(
     (r) => r.start_date <= todayStr && r.end_date >= todayStr
   );

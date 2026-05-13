@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import toast from "react-hot-toast";
 import StatusBadge from "@/components/StatusBadge";
-import { supabase, Reservation } from "@/lib/supabase";
+import ReservationDetailModal from "@/components/admin/ReservationDetailModal";
+import { supabase, Reservation, Vehicle, Admin } from "@/lib/supabase";
 
 // 요일 이름
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -46,13 +47,26 @@ interface EventBar {
   isEnd: boolean;
 }
 
-export default function CalendarView() {
+interface CalendarProps {
+  adminId?: string;
+  adminRole?: string;
+}
+
+export default function CalendarView({ adminId, adminRole }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [popupReservation, setPopupReservation] = useState<Reservation | null>(null);
   const [dayListDate, setDayListDate] = useState<string | null>(null);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [admins, setAdmins] = useState<Admin[]>([]);
+
+  // 모달에 전달할 차량/관리자 목록
+  useEffect(() => {
+    supabase.from("vehicles").select("*").order("sort_order").then(({ data }) => setVehicles(data || []));
+    supabase.from("admins").select("*").then(({ data }) => setAdmins(data || []));
+  }, []);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -531,102 +545,17 @@ export default function CalendarView() {
         )}
       </div>
 
-      {/* 일정 상세 팝업 */}
+      {/* 공통 예약 상세 모달 */}
       {popupReservation && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setPopupReservation(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[80vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
-            {/* 팝업 헤더 */}
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between rounded-t-2xl">
-              <h3 className="font-bold text-gray-900">예약 상세</h3>
-              <button
-                onClick={() => setPopupReservation(null)}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
-              >
-                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4">
-              {/* 차량 + 상태 */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${dotColor[popupReservation.status]}`} />
-                  <span className="font-bold text-lg text-gray-900">{popupReservation.vehicles?.name || "차량"}</span>
-                </div>
-                <StatusBadge status={popupReservation.status} />
-              </div>
-
-              {/* 기본 정보 */}
-              <div className="bg-gray-50 rounded-xl p-4 space-y-2.5">
-                <PopupRow label="신청자" value={`${popupReservation.guest_name} (${popupReservation.department})`} />
-                <PopupRow label="연락처" value={popupReservation.phone} />
-                <PopupRow
-                  label="사용기간"
-                  value={
-                    popupReservation.start_date === popupReservation.end_date
-                      ? `${popupReservation.start_date} ${popupReservation.start_time?.slice(0, 5)} ~ ${popupReservation.end_time?.slice(0, 5)}`
-                      : `${popupReservation.start_date} ${popupReservation.start_time?.slice(0, 5)} ~ ${popupReservation.end_date} ${popupReservation.end_time?.slice(0, 5)}`
-                  }
-                />
-                {popupReservation.purpose && <PopupRow label="사용목적" value={popupReservation.purpose} />}
-                {popupReservation.destination && <PopupRow label="행선지" value={popupReservation.destination} />}
-                {popupReservation.passenger_count && <PopupRow label="탑승인원" value={`${popupReservation.passenger_count}명`} />}
-                {popupReservation.driver_name && <PopupRow label="운전자" value={popupReservation.driver_name} />}
-              </div>
-
-              {/* 승인 현황 */}
-              <div className="bg-gray-50 rounded-xl p-4">
-                <p className="text-xs font-medium text-gray-700 mb-2">승인 현황</p>
-                <div className="flex gap-3">
-                  <div className="flex-1 text-center">
-                    <div className={`text-xs font-bold ${popupReservation.staff_approved_at ? "text-emerald-600" : "text-gray-300"}`}>
-                      {popupReservation.staff_approved_at ? "✓ 승인" : "⏳ 대기"}
-                    </div>
-                    <div className="text-[10px] text-gray-400 mt-0.5">차량담당 장로</div>
-                    {popupReservation.staff_approved_at && (
-                      <div className="text-[10px] text-gray-400">
-                        {new Date(popupReservation.staff_approved_at).toLocaleDateString("ko-KR")}
-                      </div>
-                    )}
-                  </div>
-                  <div className="w-px bg-gray-200" />
-                  <div className="flex-1 text-center">
-                    <div className={`text-xs font-bold ${popupReservation.manager_approved_at ? "text-green-600" : "text-gray-300"}`}>
-                      {popupReservation.manager_approved_at ? "✓ 승인" : "⏳ 대기"}
-                    </div>
-                    <div className="text-[10px] text-gray-400 mt-0.5">기획장로</div>
-                    {popupReservation.manager_approved_at && (
-                      <div className="text-[10px] text-gray-400">
-                        {new Date(popupReservation.manager_approved_at).toLocaleDateString("ko-KR")}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* 처리 시각 */}
-              <div className="bg-gray-50 rounded-xl p-4 space-y-2.5">
-                <PopupRow label="신청일" value={new Date(popupReservation.created_at).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })} />
-                {popupReservation.picked_up_at && (
-                  <PopupRow label="대여 시작" value={new Date(popupReservation.picked_up_at).toLocaleDateString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })} />
-                )}
-                {popupReservation.returned_at && (
-                  <PopupRow label="반납 완료" value={new Date(popupReservation.returned_at).toLocaleDateString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })} />
-                )}
-              </div>
-
-              {/* 관리자 메모 */}
-              {popupReservation.admin_note && (
-                <div className="bg-yellow-50 rounded-xl p-4">
-                  <p className="text-xs font-medium text-yellow-700 mb-1">관리자 메모</p>
-                  <p className="text-sm text-yellow-800">{popupReservation.admin_note}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <ReservationDetailModal
+          reservation={popupReservation}
+          adminId={adminId || ""}
+          adminRole={adminRole || ""}
+          vehicles={vehicles}
+          admins={admins}
+          onClose={() => setPopupReservation(null)}
+          onUpdated={() => fetchReservations()}
+        />
       )}
 
       {/* 날짜별 일정 목록 팝업 */}
@@ -879,11 +808,3 @@ function MiniStat({ label, count }: { label: string; count: number }) {
   );
 }
 
-function PopupRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between items-start gap-4">
-      <span className="text-xs text-gray-400 shrink-0">{label}</span>
-      <span className="text-xs text-gray-900 text-right">{value}</span>
-    </div>
-  );
-}
