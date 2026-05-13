@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
+import { getAdminFromRequest, unauthorizedResponse, forbiddenResponse } from "@/lib/auth";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// 테스트 발송 - 환경변수, API 연결, 실제 발송까지 단계별 진단
+// 테스트 발송 (최고관리자만 - JWT 인증)
 export async function POST(request: NextRequest) {
+  const admin = getAdminFromRequest(request);
+  if (!admin) return unauthorizedResponse();
+  if (admin.role !== "super_admin") return forbiddenResponse("최고관리자만 테스트 발송할 수 있습니다");
+
   try {
     const { phone } = await request.json();
 

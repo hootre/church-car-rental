@@ -4,14 +4,19 @@
 // =====================================================
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getAdminFromRequest, unauthorizedResponse, forbiddenResponse } from "@/lib/auth";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// 일괄 예약 등록
+// 일괄 예약 등록 (최고관리자만)
 export async function POST(request: NextRequest) {
+  const admin = getAdminFromRequest(request);
+  if (!admin) return unauthorizedResponse();
+  if (admin.role !== "super_admin") return forbiddenResponse("최고관리자만 일괄 등록할 수 있습니다");
+
   try {
     const { reservations } = await request.json();
 

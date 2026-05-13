@@ -1,14 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
+import {
+  signToken,
+  setTokenCookie,
+  clearTokenCookie,
+  checkRateLimit,
+  resetRateLimit,
+} from "@/lib/auth";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+// 로그인
 export async function POST(request: NextRequest) {
   try {
+    // IP 기반 레이트 리밋
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      "unknown";
+
+    const rateCheck = checkRateLimit(ip);
+    if (!rateCheck.allowed) {
+      const retryMin = Math.ceil(rateCheck.retryAfterMs / 60000);
+      return NextResponse.json(
+        { error: `로그인 시도가 너무 많습니다. ${retryMin}분 후에 다시 시도해 주세요` },
+        { status: 429 }
+      );
+    }
+
     const { login_id, password } = await request.json();
 
     if (!login_id || !password) {
@@ -36,15 +59,13 @@ export async function POST(request: NextRequest) {
     // 비밀번호 검증
     let isValid = false;
 
-    // bcrypt 해시인지 확인 ($2a$ 또는 $2b$로 시작)
     if (admin.password_hash.startsWith("$2")) {
       isValid = await bcrypt.compare(password, admin.password_hash);
     } else {
-      // 초기 평문 비밀번호 (첫 로그인 시 해싱으로 업그레이드)
+      // 초기 평문 비밀번호 → 해싱 업그레이드
       isValid = password === admin.password_hash;
       if (isValid) {
-        // 평문을 해시로 업그레이드
-        const hash = await bcrypt.hash(password, 10);
+        const hash = await bcrypt.hash(password, 12);
         await supabase
           .from("admins")
           .update({ password_hash: hash })
@@ -59,13 +80,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 로그인 성공 → 레이트 리밋 초기화
+    resetRateLimit(ip);
+
+    // JWT 토큰 생성
+    const token = signToken({
+      id: admin.id,
+      login_id: admin.login_id,
+      name: admin.name,
+      role: admin.role,
+    });
+
     // 마지막 로그인 시간 업데이트
     await supabase
       .from("admins")
       .update({ last_login_at: new Date().toISOString() })
       .eq("id", admin.id);
 
-    return NextResponse.json({
+    // 응답에 httpOnly 쿠키 설정
+    const response = NextResponse.json({
       admin: {
         id: admin.id,
         login_id: admin.login_id,
@@ -73,6 +106,9 @@ export async function POST(request: NextRequest) {
         role: admin.role,
       },
     });
+
+    setTokenCookie(response, token);
+    return response;
   } catch (err) {
     console.error("Auth error:", err);
     return NextResponse.json(
@@ -80,4 +116,11 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// 로그아웃 (쿠키 삭제)
+export async function DELETE() {
+  const response = NextResponse.json({ success: true });
+  clearTokenCookie(response);
+  return response;
 }

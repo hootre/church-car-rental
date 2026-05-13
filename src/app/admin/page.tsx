@@ -110,7 +110,11 @@ export default function AdminPage() {
     setAuthLoading(false);
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    // 서버에서 JWT 쿠키 삭제
+    try {
+      await fetch("/api/admin/auth", { method: "DELETE" });
+    } catch { /* ignore */ }
     localStorage.removeItem("admin_session");
     sessionStorage.removeItem("admin_session");
     setAdminSession(null);

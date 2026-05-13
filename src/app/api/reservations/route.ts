@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { notifyUserApproved } from "@/lib/notifications";
 import { writeAdminLog } from "@/lib/admin-log";
+import { getAdminFromRequest, unauthorizedResponse, forbiddenResponse } from "@/lib/auth";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -109,23 +110,27 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 예약 상태 업데이트 (관리자)
-// - status 만 보내면 상태 전이
-// - vehicle_id / start_date / start_time / end_date / end_time 만 보내면 일정 수정
+// 예약 상태 업데이트 (관리자 - JWT 인증 필수)
 export async function PATCH(request: NextRequest) {
+  // 서버측 인증 검증
+  const admin = getAdminFromRequest(request);
+  if (!admin) return unauthorizedResponse();
+
   try {
     const body = await request.json();
     const {
       id,
       status,
       admin_note,
-      admin_id,
       vehicle_id,
       start_date,
       start_time,
       end_date,
       end_time,
     } = body;
+
+    // JWT에서 admin_id 사용 (클라이언트가 보낸 admin_id는 무시)
+    const admin_id = admin.id;
 
     if (!id) {
       return NextResponse.json(
@@ -247,18 +252,18 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// 예약 삭제 (최고관리자만)
+// 예약 삭제 (최고관리자만 - JWT 인증 필수)
 export async function DELETE(request: NextRequest) {
+  // 서버측 인증 + 권한 검증
+  const admin = getAdminFromRequest(request);
+  if (!admin) return unauthorizedResponse();
+  if (admin.role !== "super_admin") return forbiddenResponse("최고관리자만 삭제할 수 있습니다");
+
   try {
-    const { id, admin_id, admin_role } = await request.json();
+    const { id } = await request.json();
 
     if (!id) {
       return NextResponse.json({ error: "ID가 필요합니다" }, { status: 400 });
-    }
-
-    // 최고관리자 권한 체크
-    if (admin_role !== "super_admin") {
-      return NextResponse.json({ error: "최고관리자만 삭제할 수 있습니다" }, { status: 403 });
     }
 
     // 삭제 대상 정보 조회 (로그용)
@@ -268,16 +273,8 @@ export async function DELETE(request: NextRequest) {
       .eq("id", id)
       .single();
 
-    // 관리자 이름 조회
-    let adminName = "관리자";
-    if (admin_id) {
-      const { data: adminData } = await supabase
-        .from("admins")
-        .select("name")
-        .eq("id", admin_id)
-        .single();
-      if (adminData) adminName = adminData.name;
-    }
+    const admin_id = admin.id;
+    const adminName = admin.name;
 
     const { error } = await supabase.from("reservations").delete().eq("id", id);
 

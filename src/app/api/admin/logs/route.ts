@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getAdminFromRequest, unauthorizedResponse } from "@/lib/auth";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// 로그 조회 (최신 100건)
+// 로그 조회 (최신 100건 - 관리자 인증 필수)
 export async function GET(request: NextRequest) {
+  const admin = getAdminFromRequest(request);
+  if (!admin) return unauthorizedResponse();
   const { searchParams } = new URL(request.url);
   const limit = parseInt(searchParams.get("limit") || "100");
 
