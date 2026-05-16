@@ -110,17 +110,25 @@ export default function ReservationHistory({ adminRole, adminId }: Props) {
   // 오늘 날짜 (한국시간 기준)
   const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
 
-  // 오늘 해당 항목
-  const todayItems = sorted.filter((r) => r.start_date <= todayStr && r.end_date >= todayStr);
+  // 미래/진행중 vs 과거 분리
+  // - 예정: 아직 끝나지 않은 예약 (end_date >= today)
+  // - 지난 예약: 이미 끝난 예약 (end_date < today)
+  const upcomingItems = sorted.filter((r) => r.end_date >= todayStr);
+  const pastItems = sorted.filter((r) => r.end_date < todayStr);
+  // 호환용 (기존 todayItems / restItems 사용처가 남아 있을 경우 대비)
+  const todayItems = upcomingItems.filter(
+    (r) => r.start_date <= todayStr && r.end_date >= todayStr
+  );
   const todayIds = new Set(todayItems.map((r) => r.id));
-
-  // 나머지 항목
-  const restItems = sorted.filter((r) => !todayIds.has(r.id));
+  const restItems = upcomingItems.filter((r) => !todayIds.has(r.id));
 
   // 월별 그룹핑
   const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set());
 
-  function groupByMonth(items: Reservation[]): { key: string; label: string; items: Reservation[] }[] {
+  function groupByMonth(
+    items: Reservation[],
+    order: "asc" | "desc" = "asc"
+  ): { key: string; label: string; items: Reservation[] }[] {
     const groups: Record<string, Reservation[]> = {};
     for (const r of items) {
       const date = new Date(r.start_date || r.created_at);
@@ -129,8 +137,7 @@ export default function ReservationHistory({ adminRole, adminId }: Props) {
       groups[key].push(r);
     }
     return Object.entries(groups)
-      // 월 그룹은 최신 달이 위 (desc)
-      .sort(([a], [b]) => b.localeCompare(a))
+      .sort(([a], [b]) => (order === "asc" ? a.localeCompare(b) : b.localeCompare(a)))
       .map(([key, items]) => {
         const [year, month] = key.split("-");
         // 월 안에서는 1일 → 30일 순 (start_date + start_time asc)
@@ -143,7 +150,11 @@ export default function ReservationHistory({ adminRole, adminId }: Props) {
       });
   }
 
-  const monthlyGroups = groupByMonth(restItems);
+  // 예정: 가까운 월 위 (asc) / 지난 예약: 최근 월 위 (desc)
+  const upcomingMonthly = groupByMonth(upcomingItems, "asc");
+  const pastMonthly = groupByMonth(pastItems, "desc");
+  // 호환용
+  const monthlyGroups = upcomingMonthly;
 
   function toggleMonth(monthKey: string) {
     setCollapsedMonths((prev) => {
@@ -454,12 +465,22 @@ export default function ReservationHistory({ adminRole, adminId }: Props) {
           )}
 
           {/* 월별 아코디언 */}
-          {monthlyGroups.map((group) => {
+          {[...upcomingMonthly, ...pastMonthly].map((group, idx) => {
+            const isPast = idx >= upcomingMonthly.length;
+            const isFirstPast = isPast && idx === upcomingMonthly.length;
             const isCollapsed = collapsedMonths.has(group.key);
             const groupSelectedCount = group.items.filter((r) => selectedIds.has(r.id)).length;
 
             return (
-              <div key={group.key} className="rounded-2xl overflow-hidden border border-gray-200 bg-white">
+              <div key={(isPast ? "p-" : "u-") + group.key}>
+                {isFirstPast && (
+                  <div className="flex items-center gap-3 px-1 pt-3 pb-1">
+                    <div className="h-px flex-1 bg-gray-300" />
+                    <span className="text-xs font-medium text-gray-500">↓ 지난 예약</span>
+                    <div className="h-px flex-1 bg-gray-300" />
+                  </div>
+                )}
+              <div className={`rounded-2xl overflow-hidden border border-gray-200 bg-white ${isPast ? "opacity-60" : ""}`}>
                 {/* 월별 헤더 */}
                 <button
                   onClick={() => toggleMonth(group.key)}
@@ -543,6 +564,7 @@ export default function ReservationHistory({ adminRole, adminId }: Props) {
                     ))}
                   </div>
                 )}
+              </div>
               </div>
             );
           })}
