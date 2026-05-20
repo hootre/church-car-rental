@@ -49,6 +49,11 @@ export default function ReservePage() {
     form.destination.trim() &&
     selectedVehicles.every((v) => vehicleDetails[v.id]?.driver_name?.trim());
 
+  function goToStep(s: Step) {
+    setStep(s);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function fetchAvailableVehicles() {
     setLoading(true);
     setSelectedVehicles([]);
@@ -88,7 +93,7 @@ export default function ReservePage() {
     );
     setAvailableVehicles(available);
     setLoading(false);
-    setStep("vehicle");
+    goToStep("vehicle");
   }
 
   const vehicleTypes = Array.from(new Set(availableVehicles.map((v) => v.type)));
@@ -131,25 +136,32 @@ export default function ReservePage() {
 
     for (const vehicle of selectedVehicles) {
       const details = vehicleDetails[vehicle.id];
-      const { error } = await supabase.from("reservations").insert({
-        vehicle_id: vehicle.id,
-        guest_name: form.guest_name.trim(),
-        phone: form.phone.trim(),
-        department: form.department.trim(),
-        purpose: form.purpose.trim(),
-        destination: form.destination.trim(),
-        passenger_count: details.passenger_count ? parseInt(details.passenger_count) : null,
-        driver_name: details.driver_name.trim(),
-        start_date: form.start_date,
-        start_time: form.start_time,
-        end_date: form.end_date,
-        end_time: form.end_time,
-      });
-
-      if (error) {
+      try {
+        const res = await fetch("/api/reservations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            vehicle_id: vehicle.id,
+            guest_name: form.guest_name.trim(),
+            phone: form.phone.trim(),
+            department: form.department.trim(),
+            purpose: form.purpose.trim(),
+            destination: form.destination.trim(),
+            passenger_count: details.passenger_count ? parseInt(details.passenger_count) : null,
+            driver_name: details.driver_name.trim(),
+            start_date: form.start_date,
+            start_time: form.start_time,
+            end_date: form.end_date,
+            end_time: form.end_time,
+          }),
+        });
+        if (res.ok) {
+          successCount++;
+        } else {
+          failureCount++;
+        }
+      } catch {
         failureCount++;
-      } else {
-        successCount++;
       }
     }
 
@@ -291,8 +303,8 @@ export default function ReservePage() {
             )}
 
             <div className="mt-6 flex gap-3">
-              <button onClick={() => { setStep("schedule"); setSelectedVehicles([]); setVehicleDetails({}); setFilterType("all"); }} className="btn-outline">이전</button>
-              <button onClick={() => setStep("form")} disabled={selectedVehicles.length === 0} className="btn-primary">다음</button>
+              <button onClick={() => { goToStep("schedule"); setSelectedVehicles([]); setVehicleDetails({}); setFilterType("all"); }} className="btn-outline">이전</button>
+              <button onClick={() => goToStep("form")} disabled={selectedVehicles.length === 0} className="btn-primary">다음</button>
             </div>
           </div>
         )}
@@ -370,8 +382,8 @@ export default function ReservePage() {
             </div>
 
             <div className="mt-6 flex gap-3">
-              <button onClick={() => setStep("vehicle")} className="btn-outline">이전</button>
-              <button onClick={() => setStep("confirm")} disabled={!isFormValid} className="btn-primary">다음</button>
+              <button onClick={() => goToStep("vehicle")} className="btn-outline">이전</button>
+              <button onClick={() => goToStep("confirm")} disabled={!isFormValid} className="btn-primary">다음</button>
             </div>
           </div>
         )}
@@ -416,7 +428,7 @@ export default function ReservePage() {
             </p>
 
             <div className="mt-6 flex gap-3">
-              <button onClick={() => setStep("form")} className="btn-outline">수정</button>
+              <button onClick={() => goToStep("form")} className="btn-outline">수정</button>
               <button onClick={handleSubmit} disabled={submitting} className="btn-primary">
                 {submitting ? "신청 중..." : `${selectedVehicles.length}대 차량 신청`}
               </button>
