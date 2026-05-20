@@ -102,19 +102,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // 관리자에게 푸시 알림 전송 (비동기 — 실패해도 예약은 정상 반환)
-    const { data: vehicle } = await supabase
-      .from("vehicles")
-      .select("name")
-      .eq("id", vehicle_id)
-      .single();
+    // 관리자에게 푸시 알림 전송 (await 필수 — Vercel에서 return 후 함수 종료됨)
+    try {
+      const { data: vehicle } = await supabase
+        .from("vehicles")
+        .select("name")
+        .eq("id", vehicle_id)
+        .single();
 
-    sendPushToAllAdmins({
-      title: "🚗 새 차량 대여 신청",
-      body: `${guest_name} (${department}) — ${vehicle?.name || "차량"} / ${start_date}~${end_date}`,
-      url: "/admin",
-      tag: "new-reservation",
-    }).catch((err) => console.error("[PUSH] 푸시 알림 실패:", err));
+      await sendPushToAllAdmins({
+        title: "새 차량 대여 신청",
+        body: `${guest_name} (${department}) — ${vehicle?.name || "차량"} / ${start_date}~${end_date}`,
+        url: "/admin",
+        tag: "new-reservation",
+      });
+    } catch (err) {
+      console.error("[PUSH] 푸시 알림 실패:", err);
+    }
 
     return NextResponse.json(data, { status: 201 });
   } catch {

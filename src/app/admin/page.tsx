@@ -33,6 +33,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>("calendar");
   const [pendingCount, setPendingCount] = useState(0);
   const [staffApprovedCount, setStaffApprovedCount] = useState(0);
+  const [pushDenied, setPushDenied] = useState(false);
 
   const fetchPendingCount = useCallback(async () => {
     const { count: pending } = await supabase
@@ -54,6 +55,10 @@ export default function AdminPage() {
       fetchPendingCount();
       // 로그인 상태면 자동으로 푸시 알림 등록 시도
       autoRegisterPush();
+      // 알림 권한 차단 상태 감지
+      if ("Notification" in window && Notification.permission === "denied") {
+        setPushDenied(true);
+      }
     }
   }, [authenticated, fetchPendingCount]);
 
@@ -201,6 +206,27 @@ export default function AdminPage() {
             로그아웃
           </button>
         </div>
+
+        {/* 알림 차단 안내 */}
+        {pushDenied && (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mb-3">
+            <svg className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-amber-800">알림이 차단되어 있습니다</p>
+              <p className="text-[11px] text-amber-600 mt-0.5">
+                새 예약 알림을 받으려면 주소창 왼쪽 🔒 아이콘 → 알림 → &ldquo;허용&rdquo;으로 변경 후 새로고침해 주세요
+              </p>
+            </div>
+            <button onClick={() => setPushDenied(false)} className="text-amber-400 hover:text-amber-600 shrink-0">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4 overflow-x-auto scrollbar-hide">
           {visibleTabs.map((tab) => {
