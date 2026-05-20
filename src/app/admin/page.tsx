@@ -12,6 +12,7 @@ import SmsSettings from "@/components/admin/SmsSettings";
 import AdminLogs from "@/components/admin/AdminLogs";
 import { roleLabel, supabase } from "@/lib/supabase";
 import { FEATURE_FLAGS } from "@/lib/feature-flags";
+import PushNotificationToggle from "@/components/admin/PushNotificationToggle";
 
 type Tab = "calendar" | "status" | "history" | "vehicles" | "admins";
 
@@ -193,10 +194,13 @@ export default function AdminPage() {
               {adminSession?.name} ({roleLabel[adminSession?.role || ""] || adminSession?.role})
             </p>
           </div>
-          <button onClick={handleLogout}
-            className="text-xs text-gray-400 hover:text-red-500 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-red-50">
-            로그아웃
-          </button>
+          <div className="flex items-center gap-1">
+            {adminSession && <PushNotificationToggle adminId={adminSession.id} />}
+            <button onClick={handleLogout}
+              className="text-xs text-gray-400 hover:text-red-500 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-red-50">
+              로그아웃
+            </button>
+          </div>
         </div>
 
         <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4 overflow-x-auto scrollbar-hide">

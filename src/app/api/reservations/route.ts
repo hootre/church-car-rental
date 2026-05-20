@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { notifyUserApproved } from "@/lib/notifications";
 import { writeAdminLog } from "@/lib/admin-log";
+import { sendPushToAllAdmins } from "@/lib/push-notify";
 import { getAdminFromRequest, unauthorizedResponse, forbiddenResponse } from "@/lib/auth";
 
 const supabase = createClient(
@@ -100,6 +101,20 @@ export async function POST(request: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    // 관리자에게 푸시 알림 전송 (비동기 — 실패해도 예약은 정상 반환)
+    const { data: vehicle } = await supabase
+      .from("vehicles")
+      .select("name")
+      .eq("id", vehicle_id)
+      .single();
+
+    sendPushToAllAdmins({
+      title: "🚗 새 차량 대여 신청",
+      body: `${guest_name} (${department}) — ${vehicle?.name || "차량"} / ${start_date}~${end_date}`,
+      url: "/admin",
+      tag: "new-reservation",
+    }).catch((err) => console.error("[PUSH] 푸시 알림 실패:", err));
 
     return NextResponse.json(data, { status: 201 });
   } catch {
