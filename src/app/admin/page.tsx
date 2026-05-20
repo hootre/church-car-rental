@@ -216,8 +216,11 @@ export default function AdminPage() {
         credentials: "same-origin",
       });
       const data = await res.json();
+      const subsDetail = (data.subscriptions || [])
+        .map((s: { platform: string; endpoint_prefix: string }) => `[${s.platform}] ${s.endpoint_prefix}`)
+        .join("\n");
       setPushTestResult(
-        `발송: ${data.sentCount || 0}/${data.subCount || 0}명 | VAPID: ${data.debug?.vapidReady ? "OK" : "FAIL"} | DB에러: ${data.dbError || "없음"}`
+        `발송: ${data.sentCount || 0}/${data.subCount || 0}명 | VAPID: ${data.debug?.vapidReady ? "OK" : "FAIL"} | DB에러: ${data.dbError || "없음"}${subsDetail ? "\n--- 구독 목록 ---\n" + subsDetail : ""}`
       );
     } catch (err) {
       setPushTestResult(`오류: ${err}`);
@@ -255,7 +258,7 @@ export default function AdminPage() {
         {/* 알림 테스트 결과 */}
         {pushTestResult && (
           <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 mb-3">
-            <span className="text-xs text-gray-700 flex-1 font-mono">{pushTestResult}</span>
+            <span className="text-xs text-gray-700 flex-1 font-mono whitespace-pre-wrap break-all">{pushTestResult}</span>
             <button onClick={() => setPushTestResult(null)} className="text-gray-400 hover:text-gray-600 shrink-0">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

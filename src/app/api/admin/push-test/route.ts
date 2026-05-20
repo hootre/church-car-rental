@@ -43,6 +43,27 @@ export async function POST(request: NextRequest) {
       message = `구독 ${subCount}건 있으나 발송 실패`;
     }
 
+    // 구독 상세 정보 (모바일 vs 데스크탑 구분용)
+    const subsInfo = (subs || []).map((s) => {
+      const ep = s.endpoint || "";
+      let platform = "unknown";
+      if (ep.includes("fcm.googleapis.com") || ep.includes("firebase")) {
+        platform = "Android/Chrome";
+      } else if (ep.includes("mozilla.com") || ep.includes("push.services.mozilla.com")) {
+        platform = "Firefox";
+      } else if (ep.includes("windows.com") || ep.includes("wns")) {
+        platform = "Windows/Edge";
+      } else if (ep.includes("apple") || ep.includes("push.apple.com")) {
+        platform = "Apple/Safari";
+      }
+      return {
+        id: s.id,
+        admin_id: s.admin_id,
+        platform,
+        endpoint_prefix: ep.slice(0, 80),
+      };
+    });
+
     return NextResponse.json({
       success: sentCount > 0,
       sentCount,
@@ -50,6 +71,7 @@ export async function POST(request: NextRequest) {
       debug,
       dbError: dbError?.message || null,
       message,
+      subscriptions: subsInfo,
     });
   } catch (err) {
     return NextResponse.json(
