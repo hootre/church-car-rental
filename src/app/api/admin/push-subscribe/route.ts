@@ -19,6 +19,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "유효하지 않은 구독 정보입니다" }, { status: 400 });
     }
 
+    // User-Agent에서 기기 정보 추출
+    const ua = request.headers.get("user-agent") || "";
+
     // upsert (같은 endpoint면 업데이트)
     const { error } = await supabase
       .from("push_subscriptions")
@@ -28,6 +31,7 @@ export async function POST(request: NextRequest) {
           endpoint: subscription.endpoint,
           keys_p256dh: subscription.keys.p256dh,
           keys_auth: subscription.keys.auth,
+          user_agent: ua.slice(0, 500),
           last_used_at: new Date().toISOString(),
         },
         { onConflict: "endpoint" }

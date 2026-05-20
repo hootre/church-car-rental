@@ -203,8 +203,10 @@ export default function AdminPage() {
       // 2단계: SW 구독 상태 확인
       const reg = await navigator.serviceWorker.getRegistration();
       const sub = reg ? await reg.pushManager.getSubscription() : null;
+      const myEndpoint = sub ? sub.endpoint.slice(0, 80) : "없음";
+
       if (!sub) {
-        setPushTestResult("푸시 구독 없음 — 페이지 새로고침 후 재시도");
+        setPushTestResult(`이 기기 구독: 없음\nSW 상태: ${reg ? "등록됨" : "미등록"}\n→ 페이지 새로고침 후 재시도`);
         setPushTesting(false);
         return;
       }
@@ -217,10 +219,19 @@ export default function AdminPage() {
       });
       const data = await res.json();
       const subsDetail = (data.subscriptions || [])
-        .map((s: { platform: string; endpoint_prefix: string }) => `[${s.platform}] ${s.endpoint_prefix}`)
+        .map((s: { platform: string; endpoint_prefix: string }) => {
+          const isMe = myEndpoint === s.endpoint_prefix;
+          return `${isMe ? "★ " : "  "}[${s.platform}] ${s.endpoint_prefix}`;
+        })
         .join("\n");
+
+      // 이 기기 endpoint가 서버 목록에 있는지 확인
+      const myInServer = (data.subscriptions || []).some(
+        (s: { endpoint_prefix: string }) => myEndpoint === s.endpoint_prefix
+      );
+
       setPushTestResult(
-        `발송: ${data.sentCount || 0}/${data.subCount || 0}명 | VAPID: ${data.debug?.vapidReady ? "OK" : "FAIL"} | DB에러: ${data.dbError || "없음"}${subsDetail ? "\n--- 구독 목록 ---\n" + subsDetail : ""}`
+        `발송: ${data.sentCount || 0}/${data.subCount || 0}명 | VAPID: ${data.debug?.vapidReady ? "OK" : "FAIL"}\n이 기기: ${myInServer ? "서버에 등록됨 ✓" : "⚠️ 서버에 미등록!"}\n내 endpoint: ${myEndpoint}\n--- 서버 구독 목록 (★=이 기기) ---\n${subsDetail}`
       );
     } catch (err) {
       setPushTestResult(`오류: ${err}`);

@@ -33,6 +33,17 @@ export default function AdminManagement({ currentAdminId, currentAdminRole, curr
 
   // 푸시 알림 구독 현황 (admin_id → 구독 수)
   const [pushStatus, setPushStatus] = useState<Record<string, number>>({});
+  // 기기별 상세 목록
+  const [pushDevices, setPushDevices] = useState<{
+    id: string;
+    admin_id: string;
+    device_name: string;
+    endpoint_short: string;
+    created_at: string;
+    last_used_at: string | null;
+  }[]>([]);
+  // 기기 목록 펼침 상태 (admin_id)
+  const [expandedPush, setExpandedPush] = useState<string | null>(null);
 
   const fetchAdmins = useCallback(async () => {
     setLoading(true);
@@ -50,6 +61,7 @@ export default function AdminManagement({ currentAdminId, currentAdminRole, curr
       if (pushRes.ok) {
         const pushData = await pushRes.json();
         setPushStatus(pushData.statusMap || {});
+        setPushDevices(pushData.devices || []);
       }
     } catch {
       toast.error("서버 오류");
@@ -202,9 +214,38 @@ export default function AdminManagement({ currentAdminId, currentAdminRole, curr
     }
   }
 
-  // 푸시 알림 해제 (특정 관리자의 구독 전체 삭제)
-  async function handlePushDisable(adminId: string, adminName: string) {
-    if (!confirm(`"${adminName}"의 푸시 알림 구독을 해제하시겠습니까?`)) return;
+  // 개별 기기 알림 해제
+  async function handleDeviceDelete(subscriptionId: string, deviceName: string, adminId: string) {
+    if (!confirm(`"${deviceName}" 기기의 알림을 해제하시겠습니까?`)) return;
+
+    try {
+      const res = await fetch("/api/admin/push-manage", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription_id: subscriptionId }),
+      });
+
+      if (res.ok) {
+        toast.success(`${deviceName} 알림 해제됨`);
+        // 로컬 상태 업데이트
+        setPushDevices((prev) => prev.filter((d) => d.id !== subscriptionId));
+        setPushStatus((prev) => {
+          const next = { ...prev };
+          next[adminId] = Math.max((next[adminId] || 1) - 1, 0);
+          if (next[adminId] === 0) delete next[adminId];
+          return next;
+        });
+      } else {
+        toast.error("알림 해제에 실패했습니다");
+      }
+    } catch {
+      toast.error("서버 오류");
+    }
+  }
+
+  // 관리자 전체 기기 알림 해제
+  async function handlePushDisableAll(adminId: string, adminName: string) {
+    if (!confirm(`"${adminName}"의 모든 기기 알림을 해제하시겠습니까?`)) return;
 
     try {
       const res = await fetch("/api/admin/push-manage", {
@@ -214,12 +255,14 @@ export default function AdminManagement({ currentAdminId, currentAdminRole, curr
       });
 
       if (res.ok) {
-        toast.success(`${adminName}의 알림이 해제되었습니다`);
+        toast.success(`${adminName}의 모든 알림 해제됨`);
+        setPushDevices((prev) => prev.filter((d) => d.admin_id !== adminId));
         setPushStatus((prev) => {
           const next = { ...prev };
           delete next[adminId];
           return next;
         });
+        setExpandedPush(null);
       } else {
         toast.error("알림 해제에 실패했습니다");
       }
@@ -412,17 +455,20 @@ export default function AdminManagement({ currentAdminId, currentAdminRole, curr
 
                 {/* 액션 */}
                 <div className="flex items-center gap-1 shrink-0">
-                  {/* 푸시 알림 상태 */}
+                  {/* 푸시 알림 상태 — 클릭하면 기기 목록 펼침 */}
                   {(pushStatus[admin.id] || 0) > 0 ? (
                     <button
-                      onClick={() => handlePushDisable(admin.id, admin.name)}
-                      className="p-1.5 text-purple-500 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors"
-                      title={`알림 ON (${pushStatus[admin.id]}기기) — 클릭하여 해제`}
+                      onClick={() => setExpandedPush(expandedPush === admin.id ? null : admin.id)}
+                      className={`relative p-1.5 text-purple-500 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors ${expandedPush === admin.id ? "bg-purple-50" : ""}`}
+                      title={`알림 ON (${pushStatus[admin.id]}기기) — 클릭하여 기기 관리`}
                     >
                       <svg className="w-4 h-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                           d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                       </svg>
+                      <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] bg-purple-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+                        {pushStatus[admin.id]}
+                      </span>
                     </button>
                   ) : (
                     <span
@@ -465,6 +511,57 @@ export default function AdminManagement({ currentAdminId, currentAdminRole, curr
                   )}
                 </div>
               </div>
+
+              {/* 기기별 알림 관리 (펼침) */}
+              {expandedPush === admin.id && (pushStatus[admin.id] || 0) > 0 && (
+                <div className="mt-2 pt-2 border-t border-purple-100 bg-purple-50/50 -mx-4 px-4 pb-2 rounded-b-xl">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[11px] font-semibold text-purple-700">등록된 기기 ({pushStatus[admin.id]})</p>
+                    <button
+                      onClick={() => handlePushDisableAll(admin.id, admin.name)}
+                      className="text-[10px] text-red-400 hover:text-red-600 transition-colors"
+                    >
+                      전체 해제
+                    </button>
+                  </div>
+                  <div className="space-y-1.5">
+                    {pushDevices
+                      .filter((d) => d.admin_id === admin.id)
+                      .map((device) => (
+                        <div
+                          key={device.id}
+                          className="flex items-center gap-2 bg-white rounded-lg px-2.5 py-2 border border-purple-100"
+                        >
+                          <span className="text-sm">
+                            {device.device_name.includes("Android") || device.device_name.includes("SM-") || device.device_name.includes("Galaxy")
+                              ? "📱"
+                              : device.device_name.includes("iPhone") || device.device_name.includes("iPad")
+                              ? "📱"
+                              : device.device_name.includes("Mac") || device.device_name.includes("Windows")
+                              ? "💻"
+                              : "📱"}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-gray-800 truncate">{device.device_name}</p>
+                            <p className="text-[10px] text-gray-400">
+                              등록: {new Date(device.created_at).toLocaleDateString("ko-KR")}
+                              {device.last_used_at && ` · 최근: ${new Date(device.last_used_at).toLocaleDateString("ko-KR")}`}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => handleDeviceDelete(device.id, device.device_name, admin.id)}
+                            className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0"
+                            title="이 기기 알림 해제"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
 
               {/* 비밀번호 변경 */}
               <div className="mt-2 pt-2 border-t border-gray-100">
