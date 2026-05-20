@@ -1,11 +1,66 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
 export default function Header() {
   const pathname = usePathname();
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+
+  useEffect(() => {
+    // 이미 설치된 상태인지 확인 (standalone 또는 PWA)
+    const standalone = window.matchMedia("(display-mode: standalone)").matches
+      || (navigator as unknown as { standalone?: boolean }).standalone === true;
+    if (standalone) {
+      setIsInstalled(true);
+      return;
+    }
+
+    // iOS Safari 감지
+    const ua = navigator.userAgent;
+    const isiOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|Chrome/.test(ua);
+    if (isiOS && isSafari) {
+      setIsIOS(true);
+    }
+
+    function handleBeforeInstall(e: Event) {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+    }
+
+    function handleAppInstalled() {
+      setIsInstalled(true);
+      setInstallPrompt(null);
+    }
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+    window.addEventListener("appinstalled", handleAppInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  async function handleInstall() {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === "accepted") {
+      setInstallPrompt(null);
+      setIsInstalled(true);
+    }
+  }
 
   return (
     <>
@@ -24,13 +79,74 @@ export default function Header() {
             <span className="text-primary-600 font-bold text-lg">차량부</span>
           </Link>
 
-          {/* 데스크탑 네비게이션 */}
-          <nav className="hidden md:flex items-center gap-1">
-            <DesktopNavItem href="/" label="홈" active={pathname === "/"} />
-            <DesktopNavItem href="/reserve" label="예약신청" active={pathname === "/reserve"} />
-            <DesktopNavItem href="/check" label="예약조회" active={pathname === "/check"} />
-            <DesktopNavItem href="/admin" label="관리자" active={pathname?.startsWith("/admin")} />
-          </nav>
+          <div className="flex items-center gap-1">
+            {/* 설치 버튼 (Chrome/Edge 등) */}
+            {!isInstalled && installPrompt && (
+              <button
+                onClick={handleInstall}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors mr-1"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                설치
+              </button>
+            )}
+
+            {/* iOS Safari 설치 안내 */}
+            {!isInstalled && !installPrompt && isIOS && (
+              <div className="relative mr-1">
+                <button
+                  onClick={() => setShowIOSGuide(!showIOSGuide)}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  설치
+                </button>
+                {showIOSGuide && (
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 p-4 z-[100]">
+                    <button onClick={() => setShowIOSGuide(false)} className="absolute top-2 right-2 text-gray-400 hover:text-gray-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                    <p className="text-sm font-semibold text-gray-900 mb-2">앱 설치 방법</p>
+                    <ol className="text-xs text-gray-600 space-y-1.5">
+                      <li className="flex items-start gap-1.5">
+                        <span className="font-bold text-primary-600 shrink-0">1.</span>
+                        <span>하단 Safari 메뉴에서 <span className="inline-block align-text-bottom">
+                          <svg className="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                          </svg>
+                        </span> (공유) 버튼 탭</span>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <span className="font-bold text-primary-600 shrink-0">2.</span>
+                        <span>&ldquo;홈 화면에 추가&rdquo; 선택</span>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <span className="font-bold text-primary-600 shrink-0">3.</span>
+                        <span>&ldquo;추가&rdquo; 버튼 탭</span>
+                      </li>
+                    </ol>
+                    <p className="text-[10px] text-gray-400 mt-2">홈 화면에 추가하면 앱처럼 사용할 수 있습니다</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 데스크탑 네비게이션 */}
+            <nav className="hidden md:flex items-center gap-1">
+              <DesktopNavItem href="/" label="홈" active={pathname === "/"} />
+              <DesktopNavItem href="/reserve" label="예약신청" active={pathname === "/reserve"} />
+              <DesktopNavItem href="/check" label="예약조회" active={pathname === "/check"} />
+              <DesktopNavItem href="/admin" label="관리자" active={pathname?.startsWith("/admin")} />
+            </nav>
+          </div>
         </div>
       </header>
 

@@ -31,15 +31,25 @@ export default function AdminManagement({ currentAdminId, currentAdminRole, curr
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
 
+  // 푸시 알림 구독 현황 (admin_id → 구독 수)
+  const [pushStatus, setPushStatus] = useState<Record<string, number>>({});
+
   const fetchAdmins = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/admins");
-      const data = await res.json();
-      if (res.ok) {
-        setAdmins(data);
+      const [adminsRes, pushRes] = await Promise.all([
+        fetch("/api/admin/admins"),
+        fetch("/api/admin/push-manage"),
+      ]);
+      const adminsData = await adminsRes.json();
+      if (adminsRes.ok) {
+        setAdmins(adminsData);
       } else {
         toast.error("관리자 목록을 불러오지 못했습니다");
+      }
+      if (pushRes.ok) {
+        const pushData = await pushRes.json();
+        setPushStatus(pushData.statusMap || {});
       }
     } catch {
       toast.error("서버 오류");
@@ -186,6 +196,32 @@ export default function AdminManagement({ currentAdminId, currentAdminRole, curr
         fetchAdmins();
       } else {
         toast.error("변경에 실패했습니다");
+      }
+    } catch {
+      toast.error("서버 오류");
+    }
+  }
+
+  // 푸시 알림 해제 (특정 관리자의 구독 전체 삭제)
+  async function handlePushDisable(adminId: string, adminName: string) {
+    if (!confirm(`"${adminName}"의 푸시 알림 구독을 해제하시겠습니까?`)) return;
+
+    try {
+      const res = await fetch("/api/admin/push-manage", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ admin_id: adminId }),
+      });
+
+      if (res.ok) {
+        toast.success(`${adminName}의 알림이 해제되었습니다`);
+        setPushStatus((prev) => {
+          const next = { ...prev };
+          delete next[adminId];
+          return next;
+        });
+      } else {
+        toast.error("알림 해제에 실패했습니다");
       }
     } catch {
       toast.error("서버 오류");
@@ -375,33 +411,59 @@ export default function AdminManagement({ currentAdminId, currentAdminRole, curr
                 </div>
 
                 {/* 액션 */}
-                {admin.id !== currentAdminId && (
-                  <div className="flex items-center gap-1 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
+                  {/* 푸시 알림 상태 */}
+                  {(pushStatus[admin.id] || 0) > 0 ? (
                     <button
-                      onClick={() => toggleActive(admin)}
-                      className={`relative w-10 h-5 rounded-full transition-colors ${
-                        admin.is_active ? "bg-green-400" : "bg-gray-300"
-                      }`}
-                      title={admin.is_active ? "비활성화" : "활성화"}
+                      onClick={() => handlePushDisable(admin.id, admin.name)}
+                      className="p-1.5 text-purple-500 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors"
+                      title={`알림 ON (${pushStatus[admin.id]}기기) — 클릭하여 해제`}
                     >
-                      <div
-                        className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                          admin.is_active ? "translate-x-5" : "translate-x-0.5"
-                        }`}
-                      />
+                      <svg className="w-4 h-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                      </svg>
                     </button>
-                    <button
-                      onClick={() => handleDelete(admin)}
-                      className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
-                      title="삭제"
+                  ) : (
+                    <span
+                      className="p-1.5 text-gray-300"
+                      title="알림 미등록"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                       </svg>
-                    </button>
-                  </div>
-                )}
+                    </span>
+                  )}
+
+                  {admin.id !== currentAdminId && (
+                    <>
+                      <button
+                        onClick={() => toggleActive(admin)}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${
+                          admin.is_active ? "bg-green-400" : "bg-gray-300"
+                        }`}
+                        title={admin.is_active ? "비활성화" : "활성화"}
+                      >
+                        <div
+                          className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                            admin.is_active ? "translate-x-5" : "translate-x-0.5"
+                          }`}
+                        />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(admin)}
+                        className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                        title="삭제"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* 비밀번호 변경 */}
