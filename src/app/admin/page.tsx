@@ -34,6 +34,8 @@ export default function AdminPage() {
   const [pendingCount, setPendingCount] = useState(0);
   const [staffApprovedCount, setStaffApprovedCount] = useState(0);
   const [pushDenied, setPushDenied] = useState(false);
+  const [pushTestResult, setPushTestResult] = useState<string | null>(null);
+  const [pushTesting, setPushTesting] = useState(false);
 
   const fetchPendingCount = useCallback(async () => {
     const { count: pending } = await supabase
@@ -186,6 +188,43 @@ export default function AdminPage() {
     { key: "admins", label: "관리자", icon: "👤", superOnly: true },
   ];
 
+  async function handlePushTest() {
+    setPushTesting(true);
+    setPushTestResult(null);
+    try {
+      // 1단계: 브라우저 알림 권한 확인
+      const perm = "Notification" in window ? Notification.permission : "unsupported";
+      if (perm !== "granted") {
+        setPushTestResult(`알림 권한: ${perm} (허용 필요)`);
+        setPushTesting(false);
+        return;
+      }
+
+      // 2단계: SW 구독 상태 확인
+      const reg = await navigator.serviceWorker.getRegistration();
+      const sub = reg ? await reg.pushManager.getSubscription() : null;
+      if (!sub) {
+        setPushTestResult("푸시 구독 없음 — 페이지 새로고침 후 재시도");
+        setPushTesting(false);
+        return;
+      }
+
+      // 3단계: 서버 푸시 테스트 API 호출
+      const res = await fetch("/api/admin/push-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+      });
+      const data = await res.json();
+      setPushTestResult(
+        `발송: ${data.sentCount || 0}/${data.subCount || 0}명 | VAPID: ${data.debug?.vapidReady ? "OK" : "FAIL"} | DB에러: ${data.dbError || "없음"}`
+      );
+    } catch (err) {
+      setPushTestResult(`오류: ${err}`);
+    }
+    setPushTesting(false);
+  }
+
   const visibleTabs = tabs.filter(
     (t) => !t.superOnly || adminSession?.role === "super_admin"
   );
@@ -201,11 +240,29 @@ export default function AdminPage() {
               {adminSession?.name} ({roleLabel[adminSession?.role || ""] || adminSession?.role})
             </p>
           </div>
-          <button onClick={handleLogout}
-            className="text-xs text-gray-400 hover:text-red-500 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-red-50">
-            로그아웃
-          </button>
+          <div className="flex items-center gap-1">
+            <button onClick={handlePushTest} disabled={pushTesting}
+              className="text-xs text-gray-400 hover:text-purple-600 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-purple-50">
+              {pushTesting ? "테스트중..." : "🔔 알림테스트"}
+            </button>
+            <button onClick={handleLogout}
+              className="text-xs text-gray-400 hover:text-red-500 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-red-50">
+              로그아웃
+            </button>
+          </div>
         </div>
+
+        {/* 알림 테스트 결과 */}
+        {pushTestResult && (
+          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 mb-3">
+            <span className="text-xs text-gray-700 flex-1 font-mono">{pushTestResult}</span>
+            <button onClick={() => setPushTestResult(null)} className="text-gray-400 hover:text-gray-600 shrink-0">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         {/* 알림 차단 안내 */}
         {pushDenied && (
