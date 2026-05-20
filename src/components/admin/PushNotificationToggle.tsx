@@ -41,7 +41,8 @@ export default function PushNotificationToggle({ adminId }: Props) {
     const permission = Notification.permission;
     info.push(`📋 알림 권한: ${permission}`);
 
-    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      || "BPtooG1pLf-sV0ZSFq_b_97c5q3V4FQ2tbjLRzHBm0LbIrqWVEYdOkn-pHvLiPMgXTn9kwPl2q433qrBkjJKH7g";
     info.push(vapidKey ? `✅ VAPID 키 설정됨 (${vapidKey.slice(0, 20)}...)` : "❌ VAPID 키 미설정");
 
     setSupported(true);
@@ -128,10 +129,11 @@ export default function PushNotificationToggle({ adminId }: Props) {
         await navigator.serviceWorker.ready;
         addDebug("SW ready");
 
-        const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+        const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+          || "BPtooG1pLf-sV0ZSFq_b_97c5q3V4FQ2tbjLRzHBm0LbIrqWVEYdOkn-pHvLiPMgXTn9kwPl2q433qrBkjJKH7g";
         if (!vapidPublicKey) {
-          addDebug("❌ NEXT_PUBLIC_VAPID_PUBLIC_KEY 환경변수 없음!");
-          toast.error("푸시 설정이 완료되지 않았습니다 (VAPID 키 미설정)");
+          addDebug("❌ VAPID 공개키 없음!");
+          toast.error("푸시 설정이 완료되지 않았습니다");
           setLoading(false);
           return;
         }
@@ -166,8 +168,9 @@ export default function PushNotificationToggle({ adminId }: Props) {
       }
     } catch (err) {
       console.error("[PUSH] 토글 오류:", err);
-      addDebug(`❌ 오류: ${err}`);
-      toast.error("알림 설정 중 오류가 발생했습니다");
+      const errMsg = err instanceof Error ? err.message : String(err);
+      addDebug(`❌ 오류: ${errMsg}`);
+      toast.error(`알림 설정 오류: ${errMsg}`);
     }
 
     setLoading(false);
