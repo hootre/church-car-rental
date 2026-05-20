@@ -184,13 +184,42 @@ export default function PushNotificationToggle({ adminId }: Props) {
   async function handleTest() {
     if (testing) return;
     setTesting(true);
-    addDebug("테스트 알림 발송 요청...");
+    addDebug("=== 테스트 시작 ===");
 
+    // 1단계: 알림 권한 재확인
+    const perm = Notification.permission;
+    addDebug(`알림 권한: ${perm}`);
+
+    if (perm !== "granted") {
+      addDebug("⚠️ 알림 권한이 granted가 아닙니다. 재요청...");
+      const newPerm = await Notification.requestPermission();
+      addDebug(`권한 재요청 결과: ${newPerm}`);
+      if (newPerm !== "granted") {
+        toast.error("알림 권한을 허용해 주세요");
+        setTesting(false);
+        return;
+      }
+    }
+
+    // 2단계: 로컬 알림 테스트 (SW 경유)
+    addDebug("로컬 SW 알림 테스트...");
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification("✅ 로컬 테스트", {
+        body: "이 알림이 보이면 브라우저 알림은 정상입니다",
+        tag: "local-test",
+      });
+      addDebug("✅ 로컬 SW 알림 발송 성공");
+    } catch (err) {
+      addDebug(`❌ 로컬 알림 실패: ${err}`);
+    }
+
+    // 3단계: 서버 푸시 테스트
+    addDebug("서버 푸시 발송 요청...");
     try {
       const res = await fetch("/api/admin/push-test", { method: "POST" });
       const data = await res.json();
 
-      // 디버그에 상세 정보 표시
       if (data.debug) {
         addDebug(`  VAPID ready: ${data.debug.vapidReady}`);
         addDebug(`  VAPID public: ${data.debug.vapidPublicSet}`);
@@ -207,7 +236,7 @@ export default function PushNotificationToggle({ adminId }: Props) {
         toast.error(data.message || data.error || "테스트 실패");
       }
     } catch (err) {
-      addDebug(`❌ 테스트 오류: ${err}`);
+      addDebug(`❌ 서버 테스트 오류: ${err}`);
       toast.error("테스트 발송 중 오류");
     }
 
