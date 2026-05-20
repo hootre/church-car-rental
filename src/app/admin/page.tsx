@@ -188,30 +188,79 @@ export default function AdminPage() {
     { key: "admins", label: "관리자", icon: "👤", superOnly: true },
   ];
 
+  // 1️⃣ 로컬 알림 테스트 (서버 푸시 없이 브라우저 자체)
+  async function handleLocalNotifTest() {
+    setPushTesting(true);
+    setPushTestResult(null);
+    try {
+      const perm = "Notification" in window ? Notification.permission : "unsupported";
+      if (perm !== "granted") {
+        if (perm === "default") {
+          const result = await Notification.requestPermission();
+          if (result !== "granted") {
+            setPushTestResult(`❌ 알림 권한 거부됨 (${result})`);
+            setPushTesting(false);
+            return;
+          }
+        } else {
+          setPushTestResult(`❌ 알림 권한: ${perm}\n→ 브라우저 설정에서 알림 허용 필요`);
+          setPushTesting(false);
+          return;
+        }
+      }
+
+      // SW를 통해 알림 표시 (백그라운드에서도 동작 확인)
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) {
+        await reg.showNotification("로컬 테스트 알림", {
+          body: "이 알림이 보이면 브라우저 알림은 정상입니다",
+          icon: "/icons/icon-192x192.png",
+          badge: "/icons/icon-72x72.png",
+          tag: "local-test",
+          vibrate: [200, 100, 200],
+        });
+        setPushTestResult("✅ 로컬 알림 발송 완료\n→ 알림이 보이면 브라우저 정상\n→ 안 보이면 Android 설정에서 Chrome 알림 확인");
+      } else {
+        // SW 없으면 Notification API 직접 사용
+        new Notification("로컬 테스트 알림", {
+          body: "이 알림이 보이면 브라우저 알림은 정상입니다",
+          icon: "/icons/icon-192x192.png",
+        });
+        setPushTestResult("✅ 로컬 알림 발송 (SW 없이)\n→ SW 미등록 — 페이지 새로고침 필요");
+      }
+    } catch (err) {
+      setPushTestResult(`❌ 로컬 알림 오류: ${err}`);
+    }
+    setPushTesting(false);
+  }
+
+  // 2️⃣ 서버 푸시 테스트
   async function handlePushTest() {
     setPushTesting(true);
     setPushTestResult(null);
     try {
-      // 1단계: 브라우저 알림 권한 확인
       const perm = "Notification" in window ? Notification.permission : "unsupported";
       if (perm !== "granted") {
-        setPushTestResult(`알림 권한: ${perm} (허용 필요)`);
+        setPushTestResult(`❌ 알림 권한: ${perm}`);
         setPushTesting(false);
         return;
       }
 
-      // 2단계: SW 구독 상태 확인
       const reg = await navigator.serviceWorker.getRegistration();
       const sub = reg ? await reg.pushManager.getSubscription() : null;
       const myEndpoint = sub ? sub.endpoint.slice(0, 80) : "없음";
 
+      // SW 상태 정보
+      const swState = reg
+        ? `active: ${!!reg.active}, waiting: ${!!reg.waiting}, installing: ${!!reg.installing}`
+        : "미등록";
+
       if (!sub) {
-        setPushTestResult(`이 기기 구독: 없음\nSW 상태: ${reg ? "등록됨" : "미등록"}\n→ 페이지 새로고침 후 재시도`);
+        setPushTestResult(`❌ 이 기기 푸시 구독 없음\nSW: ${swState}\n→ 페이지 새로고침 후 재시도`);
         setPushTesting(false);
         return;
       }
 
-      // 3단계: 서버 푸시 테스트 API 호출
       const res = await fetch("/api/admin/push-test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -225,16 +274,15 @@ export default function AdminPage() {
         })
         .join("\n");
 
-      // 이 기기 endpoint가 서버 목록에 있는지 확인
       const myInServer = (data.subscriptions || []).some(
         (s: { endpoint_prefix: string }) => myEndpoint === s.endpoint_prefix
       );
 
       setPushTestResult(
-        `발송: ${data.sentCount || 0}/${data.subCount || 0}명 | VAPID: ${data.debug?.vapidReady ? "OK" : "FAIL"}\n이 기기: ${myInServer ? "서버에 등록됨 ✓" : "⚠️ 서버에 미등록!"}\n내 endpoint: ${myEndpoint}\n--- 서버 구독 목록 (★=이 기기) ---\n${subsDetail}`
+        `발송: ${data.sentCount || 0}/${data.subCount || 0}명 | VAPID: ${data.debug?.vapidReady ? "OK" : "FAIL"}\n이 기기: ${myInServer ? "서버에 등록됨 ✓" : "⚠️ 서버에 미등록!"}\nSW: ${swState}\n내 endpoint: ${myEndpoint}\n--- 서버 구독 (★=이 기기) ---\n${subsDetail}`
       );
     } catch (err) {
-      setPushTestResult(`오류: ${err}`);
+      setPushTestResult(`❌ 오류: ${err}`);
     }
     setPushTesting(false);
   }
@@ -254,13 +302,17 @@ export default function AdminPage() {
               {adminSession?.name} ({roleLabel[adminSession?.role || ""] || adminSession?.role})
             </p>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
+            <button onClick={handleLocalNotifTest} disabled={pushTesting}
+              className="text-[11px] text-gray-400 hover:text-blue-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-blue-50">
+              {pushTesting ? "..." : "📳 로컬"}
+            </button>
             <button onClick={handlePushTest} disabled={pushTesting}
-              className="text-xs text-gray-400 hover:text-purple-600 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-purple-50">
-              {pushTesting ? "테스트중..." : "🔔 알림테스트"}
+              className="text-[11px] text-gray-400 hover:text-purple-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-purple-50">
+              {pushTesting ? "..." : "🔔 서버"}
             </button>
             <button onClick={handleLogout}
-              className="text-xs text-gray-400 hover:text-red-500 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-red-50">
+              className="text-[11px] text-gray-400 hover:text-red-500 transition-colors px-2 py-1.5 rounded-lg hover:bg-red-50">
               로그아웃
             </button>
           </div>
