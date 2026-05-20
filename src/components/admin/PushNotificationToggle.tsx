@@ -153,13 +153,18 @@ export default function PushNotificationToggle({ adminId }: Props) {
         const res = await fetch("/api/admin/push-subscribe", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
           body: JSON.stringify({ subscription: subJson }),
         });
 
+        const resText = await res.text();
+        addDebug(`서버 응답: ${res.status} — ${resText.slice(0, 200)}`);
+
         if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          addDebug(`❌ 서버 등록 실패: ${res.status} — ${JSON.stringify(errData)}`);
-          throw new Error("구독 등록 실패");
+          // 구독 실패해도 브라우저 구독은 해제
+          await sub.unsubscribe();
+          addDebug("브라우저 구독 롤백 완료");
+          throw new Error(`서버 등록 실패 (${res.status}): ${resText.slice(0, 100)}`);
         }
 
         addDebug("✅ 서버 등록 완료!");
@@ -185,12 +190,21 @@ export default function PushNotificationToggle({ adminId }: Props) {
       const res = await fetch("/api/admin/push-test", { method: "POST" });
       const data = await res.json();
 
-      if (res.ok) {
-        addDebug(`✅ 테스트 결과: ${data.message}`);
+      // 디버그에 상세 정보 표시
+      if (data.debug) {
+        addDebug(`  VAPID ready: ${data.debug.vapidReady}`);
+        addDebug(`  VAPID public: ${data.debug.vapidPublicSet}`);
+        addDebug(`  VAPID private: ${data.debug.vapidPrivateSet}`);
+      }
+      addDebug(`  DB 구독 수: ${data.subCount ?? "?"}`);
+      if (data.dbError) addDebug(`  DB 에러: ${data.dbError}`);
+
+      if (res.ok && data.success) {
+        addDebug(`✅ ${data.message}`);
         toast.success(data.message);
       } else {
-        addDebug(`❌ 테스트 실패: ${JSON.stringify(data)}`);
-        toast.error(data.error || "테스트 실패");
+        addDebug(`⚠️ ${data.message || data.error}`);
+        toast.error(data.message || data.error || "테스트 실패");
       }
     } catch (err) {
       addDebug(`❌ 테스트 오류: ${err}`);

@@ -35,12 +35,19 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("Push subscribe error:", error);
-      return NextResponse.json({ error: "구독 등록에 실패했습니다" }, { status: 500 });
+      return NextResponse.json(
+        { error: "구독 등록에 실패했습니다", detail: error.message, code: error.code },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json({ error: "서버 오류" }, { status: 500 });
+  } catch (err) {
+    console.error("Push subscribe exception:", err);
+    return NextResponse.json(
+      { error: "서버 오류", detail: String(err) },
+      { status: 500 }
+    );
   }
 }
 
