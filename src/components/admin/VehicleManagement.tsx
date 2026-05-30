@@ -20,7 +20,7 @@ interface VehicleFormData {
   capacity: number;
   description: string;
   age_limit: string;
-  category: "shared" | "personal";
+  category: "shared" | "personal" | "parish";
   insurance_company: string;
   insurance_phone: string;
   insurance_expiry: string;
@@ -100,11 +100,12 @@ function VehicleForm({ form, setForm, onSubmit, submitLabel, onCancel }: Vehicle
           <label className="block text-xs text-gray-500 mb-1">분류</label>
           <select
             value={form.category}
-            onChange={(e) => setForm((p) => ({ ...p, category: e.target.value as "shared" | "personal" }))}
+            onChange={(e) => setForm((p) => ({ ...p, category: e.target.value as "shared" | "personal" | "parish" }))}
             className="input-field !py-2 text-sm"
           >
             <option value="shared">공유차량</option>
             <option value="personal">별도관리차량</option>
+            <option value="parish">교구전용차량</option>
           </select>
         </div>
         <div>
@@ -259,6 +260,11 @@ function VehicleCard({ v, status, onLoadDetail, onToggleAvailable }: VehicleCard
                 {v.category === "personal" && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
                     개인
+                  </span>
+                )}
+                {v.category === "parish" && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium">
+                    교구
                   </span>
                 )}
               </div>
@@ -718,6 +724,11 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
     .filter(typeFilter)
     .filter(statusFilterFn)
     .sort(sortFn);
+  const parishVehicles = vehicles
+    .filter((v) => v.category === "parish")
+    .filter(typeFilter)
+    .filter(statusFilterFn)
+    .sort(sortFn);
   const personalVehicles = vehicles
     .filter((v) => v.category === "personal")
     .filter(typeFilter)
@@ -868,6 +879,32 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
               </div>
             )}
           </div>
+
+          {/* 교구전용차량 섹션 */}
+          {parishVehicles.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-1.5">
+                  <h4 className="font-bold text-sm text-gray-900">교구전용차량</h4>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium">
+                    비공유
+                  </span>
+                </div>
+                <span className="text-xs text-gray-400">({parishVehicles.length}대)</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {parishVehicles.map((v) => (
+                  <VehicleCard
+                    key={v.id}
+                    v={v}
+                    status={getVehicleStatus(v)}
+                    onLoadDetail={loadVehicleDetail}
+                    onToggleAvailable={toggleAvailable}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* 별도관리차량 섹션 */}
           {personalVehicles.length > 0 && (

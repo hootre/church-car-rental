@@ -88,8 +88,9 @@ export default function ReservePage() {
       (conflicting || []).map((r: { vehicle_id: string }) => r.vehicle_id)
     );
 
+    // 공유차량만 노출 (personal=별도관리, parish=교구전용 은 예약 화면에서 제외)
     const available = (allVehicles || []).filter(
-      (v) => !unavailableIds.has(v.id) && (v.category || "shared") !== "personal"
+      (v) => !unavailableIds.has(v.id) && (v.category || "shared") === "shared"
     );
     setAvailableVehicles(available);
     setLoading(false);

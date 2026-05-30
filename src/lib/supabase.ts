@@ -67,13 +67,17 @@ export interface Vehicle {
   age_limit: string | null;
   available: boolean;
   sort_order: number;
-  category: "shared" | "personal";
+  category: "shared" | "personal" | "parish";
 }
 
 // 차량 분류 한글 매핑
+// shared   : 누구나 예약 가능 (공유차량)
+// personal : 예약 화면 노출 안 함 (별도관리차량 - 담임/사모님 전용 등)
+// parish   : 예약 화면 노출 안 함 (교구전용차량 - 아반떼/모닝 등)
 export const categoryLabel: Record<string, string> = {
   shared: "공유차량",
   personal: "별도관리차량",
+  parish: "교구전용차량",
 };
 
 export interface VehicleInsurance {

@@ -212,11 +212,13 @@ export default function AdminPage() {
       // SW를 통해 알림 표시 (백그라운드에서도 동작 확인)
       const reg = await navigator.serviceWorker.getRegistration();
       if (reg) {
+        // vibrate 등 표준 외 옵션은 NotificationOptions 타입에 없음 → 안전하게 cast
         await reg.showNotification("로컬 테스트 알림", {
           body: "이 알림이 보이면 브라우저 알림은 정상입니다",
           icon: "/icons/icon-192x192.png",
           badge: "/icons/icon-72x72.png",
           tag: "local-test",
+          // @ts-expect-error vibrate 는 일부 브라우저(Android)에서만 지원되는 비표준 속성
           vibrate: [200, 100, 200],
         });
         setPushTestResult("✅ 로컬 알림 발송 완료\n→ 알림이 보이면 브라우저 정상\n→ 안 보이면 Android 설정에서 Chrome 알림 확인");
@@ -388,7 +390,6 @@ export default function AdminPage() {
         {activeTab === "admins" && adminSession?.role === "super_admin" && (
           <>
             {/* SMS 설정은 FEATURE_FLAGS.SMS_ENABLED=true 일 때만 노출 */}
-            {FEATURE_FLAGS.SMS_ENABLED && <SmsSettings adminId={adminSession.id} />}
             <AdminManagement currentAdminId={adminSession.id} currentAdminRole={adminSession.role} currentAdminName={adminSession.name} />
             <AdminLogs />
           </>
