@@ -429,6 +429,8 @@ export default function VehicleManagement({ adminId, adminName, adminRole }: Veh
 
   function getVehicleStatus(vehicle: Vehicle): VehicleStatus {
     if (!vehicle.available) return "unavailable";
+    // 공유차량만 사용가능/사용중 표시, 나머지는 사용불가
+    if ((vehicle.category || "shared") !== "shared") return "unavailable";
     if (inUseVehicleIds.has(vehicle.id)) return "in_use";
     return "available";
   }

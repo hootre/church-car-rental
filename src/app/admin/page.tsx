@@ -38,15 +38,19 @@ export default function AdminPage() {
   const [pushTesting, setPushTesting] = useState(false);
 
   const fetchPendingCount = useCallback(async () => {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
     const { count: pending } = await supabase
       .from("reservations")
       .select("*", { count: "exact", head: true })
-      .eq("status", "pending");
+      .eq("status", "pending")
+      .gte("end_date", today);
 
     const { count: staffApproved } = await supabase
       .from("reservations")
       .select("*", { count: "exact", head: true })
-      .eq("status", "staff_approved");
+      .eq("status", "staff_approved")
+      .gte("end_date", today);
 
     setPendingCount(pending || 0);
     setStaffApprovedCount(staffApproved || 0);
