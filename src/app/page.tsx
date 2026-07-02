@@ -13,7 +13,7 @@ export default function HomePage() {
         {/* 히어로 */}
         <div className="text-center mb-6">
           <Image
-            src="/church_logo.png"
+            src="/mainpage_logo.png"
             alt="대한예수교 장로회 한국중앙교회"
             width={240}
             height={160}
