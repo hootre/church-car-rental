@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import Header from "@/components/Header";
 
 export default function HomePage() {
@@ -11,11 +12,16 @@ export default function HomePage() {
       <main className="max-w-lg mx-auto px-4 pt-6">
         {/* 히어로 */}
         <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <span className="text-3xl">🚗</span>
-          </div>
+          <Image
+            src="/church_logo.png"
+            alt="대한예수교 장로회 한국중앙교회"
+            width={240}
+            height={160}
+            className="mx-auto mb-3 object-contain"
+            priority
+          />
           <h1 className="text-xl font-bold text-gray-900 mb-1">
-            한국중앙교회 차량부
+            차량부
           </h1>
           <p className="text-gray-500 text-sm">
             교회 차량을 간편하게 예약하세요

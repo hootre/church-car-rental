@@ -97,7 +97,15 @@ export default function ReservePage() {
     goToStep("vehicle");
   }
 
-  const vehicleTypes = Array.from(new Set(availableVehicles.map((v) => v.type)));
+  // 고정 필터 목록 (해당 타입 차량이 있을 때만 표시)
+  const fixedFilters: { key: string; label: string }[] = [
+    { key: "bus", label: "버스" },
+    { key: "charter_bus", label: "버스대절" },
+    { key: "van", label: "승합차" },
+  ];
+  const activeFilters = fixedFilters.filter((f) =>
+    availableVehicles.some((v) => v.type === f.key)
+  );
   const filteredVehicles =
     filterType === "all"
       ? availableVehicles
@@ -272,17 +280,17 @@ export default function ReservePage() {
               </div>
             )}
 
-            {vehicleTypes.length > 1 && (
+            {activeFilters.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
                 <button onClick={() => setFilterType("all")}
                   className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                     filterType === "all" ? "bg-primary-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}>전체</button>
-                {vehicleTypes.map((type) => (
-                  <button key={type} onClick={() => setFilterType(type)}
+                {activeFilters.map((f) => (
+                  <button key={f.key} onClick={() => setFilterType(f.key)}
                     className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                      filterType === type ? "bg-primary-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}>{vehicleTypeLabel[type] || type}</button>
+                      filterType === f.key ? "bg-primary-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}>{f.label}</button>
                 ))}
               </div>
             )}

@@ -8,6 +8,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // 차량 타입 한글 매핑
 export const vehicleTypeLabel: Record<string, string> = {
   bus: "버스",
+  charter_bus: "버스대절",
   van: "승합차",
   sedan: "승용차",
   suv: "SUV",

@@ -4,6 +4,7 @@ import { Vehicle, vehicleTypeLabel } from "@/lib/supabase";
 
 const typeEmoji: Record<string, string> = {
   bus: "🚌",
+  charter_bus: "🚍",
   van: "🚐",
   sedan: "🚗",
   suv: "🚙",
