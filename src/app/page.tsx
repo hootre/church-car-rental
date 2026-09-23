@@ -62,6 +62,22 @@ export default function HomePage() {
             </svg>
           </Link>
 
+          <Link href="/schedule" className="card flex items-center gap-4 hover:shadow-md transition-shadow active:scale-[0.98]">
+            <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+              <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="font-bold text-gray-900">차량 일정</h2>
+              <p className="text-sm text-gray-500">차량별 예약 일정을 달력으로 확인합니다</p>
+            </div>
+            <svg className="w-5 h-5 text-gray-400 ml-auto shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+
           <Link href="/admin" className="card flex items-center gap-4 hover:shadow-md transition-shadow active:scale-[0.98]">
             <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center shrink-0">
               <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -92,7 +108,7 @@ export default function HomePage() {
 
           <ul className="text-xs text-primary-700 space-y-1.5 leading-relaxed">
             <li>• 차량은 2주일 전 신청을 원칙으로 합니다</li>
-            <li>• 예약 신청 후 관리자 승인이 필요합니다</li>
+            <li>• 예약 신청 후 담당장로 및 부서장 결재 → 차량담당 장로 승인이 필요합니다</li>
             <li>• 차량 사용 후 원래 주차 위치에 반납해 주세요</li>
             <li>• 사용 중 문제 발생 시 차량부로 연락 바랍니다</li>
           </ul>

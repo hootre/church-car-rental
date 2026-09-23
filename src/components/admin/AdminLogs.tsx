@@ -77,7 +77,7 @@ export default function AdminLogs() {
       case "reservation_status_change": {
         const STATUS_KO: Record<string, string> = {
           pending: "대기",
-          staff_approved: "1차승인",
+          staff_approved: "1차결재",
           approved: "최종승인",
           rejected: "반려",
           in_use: "대여중",

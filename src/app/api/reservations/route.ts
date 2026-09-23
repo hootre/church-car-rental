@@ -170,12 +170,12 @@ export async function PATCH(request: NextRequest) {
     if (status) {
       updateData.status = status;
 
-      // 담당 승인 시
+      // 1차 결재(담당장로 및 부서장) 시
       if (status === "staff_approved" && admin_id) {
         updateData.staff_approved_by = admin_id;
         updateData.staff_approved_at = new Date().toISOString();
       }
-      // 부장 최종 승인 시
+      // 2차 최종 승인(차량담당 장로) 시
       if (status === "approved" && admin_id) {
         updateData.manager_approved_by = admin_id;
         updateData.manager_approved_at = new Date().toISOString();

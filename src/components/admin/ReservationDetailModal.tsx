@@ -25,7 +25,7 @@ import {
 
 const ALL_STATUSES: { value: string; label: string }[] = [
   { value: "pending", label: "대기중" },
-  { value: "staff_approved", label: "차량담당 장로 승인" },
+  { value: "staff_approved", label: "담당장로 및 부서장 결재" },
   { value: "approved", label: "승인완료" },
   { value: "in_use", label: "대여중" },
   { value: "returned", label: "반납완료" },
@@ -96,8 +96,8 @@ export default function ReservationDetailModal({
 
   // 현재 상태별 다음 정방향 액션 (빠른 승인 / 대여 시작 / 반납 완료)
   function getQuickAction(): { next: string; label: string; cls: string } | null {
-    if (r.status === "pending") return { next: "staff_approved", label: "차량담당 장로 승인", cls: "bg-emerald-500 hover:bg-emerald-600" };
-    if (r.status === "staff_approved") return { next: "approved", label: "기획장로 최종 승인", cls: "bg-green-600 hover:bg-green-700" };
+    if (r.status === "pending") return { next: "staff_approved", label: "담당장로 및 부서장 결재", cls: "bg-emerald-500 hover:bg-emerald-600" };
+    if (r.status === "staff_approved") return { next: "approved", label: "차량담당 장로 최종 승인", cls: "bg-green-600 hover:bg-green-700" };
     if (r.status === "approved") return { next: "in_use", label: "대여 시작", cls: "bg-blue-500 hover:bg-blue-600" };
     if (r.status === "in_use") return { next: "returned", label: "반납 완료", cls: "bg-purple-500 hover:bg-purple-600" };
     return null;
@@ -289,7 +289,7 @@ export default function ReservationDetailModal({
 <div class="section"><div class="section-title">차량 정보</div><table><tr><th>차량명</th><td>${vehicleName}</td></tr><tr><th>차량번호</th><td>${plateNumber}</td></tr><tr><th>차종</th><td>${vehicleType}</td></tr></table></div></div>
 <div class="section"><div class="section-title">사용 일정</div><table><tr><th>대여</th><td>${r.start_date} ${r.start_time?.slice(0, 5) || ""}</td><th>반납</th><td>${r.end_date} ${r.end_time?.slice(0, 5) || ""}</td></tr><tr><th>행선지</th><td>${r.destination || "-"}</td><th>탑승인원</th><td>${r.passenger_count ? r.passenger_count + "명" : "-"}</td></tr>${r.purpose ? `<tr><th>사용목적</th><td colspan="3">${r.purpose}</td></tr>` : ""}${r.picked_up_at || r.returned_at ? `<tr><th>실제대여</th><td>${r.picked_up_at ? new Date(r.picked_up_at).toLocaleString("ko-KR") : "-"}</td><th>실제반납</th><td>${r.returned_at ? new Date(r.returned_at).toLocaleString("ko-KR") : "-"}</td></tr>` : ""}</table></div>
 ${r.admin_note ? `<div class="section"><div class="section-title">관리자 메모</div><div class="memo-box">${r.admin_note}</div></div>` : ""}
-<div class="section"><div class="section-title">승인 현황</div><div class="approval-box"><div class="approval-card"><div class="title">차량담당 장로 승인</div>${r.staff_approved_at ? `<div class="stamp">승인</div><div class="name">${staffName}</div><div class="date">${new Date(r.staff_approved_at).toLocaleDateString("ko-KR")}</div>` : `<div class="pending">미승인</div>`}</div><div class="approval-card"><div class="title">기획장로 승인</div>${r.manager_approved_at ? `<div class="stamp">승인</div><div class="name">${managerName}</div><div class="date">${new Date(r.manager_approved_at).toLocaleDateString("ko-KR")}</div>` : `<div class="pending">미승인</div>`}</div></div></div>
+<div class="section"><div class="section-title">승인 현황</div><div class="approval-box"><div class="approval-card"><div class="title">담당장로 및 부서장 결재</div>${r.staff_approved_at ? `<div class="stamp">승인</div><div class="name">${staffName}</div><div class="date">${new Date(r.staff_approved_at).toLocaleDateString("ko-KR")}</div>` : `<div class="pending">미승인</div>`}</div><div class="approval-card"><div class="title">차량담당 장로 승인</div>${r.manager_approved_at ? `<div class="stamp">승인</div><div class="name">${managerName}</div><div class="date">${new Date(r.manager_approved_at).toLocaleDateString("ko-KR")}</div>` : `<div class="pending">미승인</div>`}</div></div></div>
 ${hasPhotos ? `<div class="section"><div class="section-title">차량 사진</div><div style="display:flex;gap:12px;padding:4px 0;">${buildPhotoHtml(pickupPhotos, "대여 시")}${buildPhotoHtml(returnPhotos, "반납 시")}</div></div>` : ""}
 <div style="margin-top:8px;"><table><tr><th style="width:70px;">신청인</th><td style="height:32px;"></td><th style="width:70px;">확인자</th><td style="height:32px;"></td></tr></table></div></div>
 <div class="footer">본 문서는 한국중앙교회 차량관리 시스템에서 자동 생성되었습니다.</div></div>
@@ -517,14 +517,15 @@ ${hasPhotos ? `<div class="section"><div class="section-title">차량 사진</di
             <div className="bg-gray-50 rounded-xl p-3">
               <div className="flex gap-3">
                 <ApprovalBlock
-                  title="1차 승인 (차량담당 장로)"
+                  title="1차 결재 (담당장로 및 부서장)"
+                  doneLabel="✓ 결재"
                   approvedAt={r.staff_approved_at}
                   approverName={getAdminName(r.staff_approved_by)}
                   color="emerald"
                 />
                 <div className="w-px bg-gray-200" />
                 <ApprovalBlock
-                  title="2차 승인 (기획장로)"
+                  title="2차 승인 (차량담당 장로)"
                   approvedAt={r.manager_approved_at}
                   approverName={getAdminName(r.manager_approved_by)}
                   color="green"
@@ -636,18 +637,20 @@ function ApprovalBlock({
   approvedAt,
   approverName,
   color,
+  doneLabel = "✓ 승인",
 }: {
   title: string;
   approvedAt: string | null;
   approverName: string;
   color: "emerald" | "green";
+  doneLabel?: string;
 }) {
   const ok = !!approvedAt;
   const textColor = color === "emerald" ? "text-emerald-600" : "text-green-600";
   return (
     <div className="flex-1 text-center">
       <div className={"text-xs font-bold " + (ok ? textColor : "text-gray-300")}>
-        {ok ? "✓ 승인" : "⏳ 대기"}
+        {ok ? doneLabel : "⏳ 대기"}
       </div>
       <div className="text-[10px] text-gray-400 mt-0.5">{title}</div>
       {ok && (

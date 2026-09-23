@@ -18,7 +18,7 @@ export const vehicleTypeLabel: Record<string, string> = {
 // 예약 상태 한글 매핑
 export const statusLabel: Record<string, string> = {
   pending: "대기중",
-  staff_approved: "차량담당 장로 승인",
+  staff_approved: "담당장로 및 부서장 결재",
   approved: "승인완료",
   rejected: "거절",
   cancelled: "예약취소",
@@ -39,7 +39,7 @@ export const statusColor: Record<string, string> = {
 // 상태 변경 시 필요한 역할
 // (※ 자유 변경 도입으로 statusTransitions 는 제거됨 — 모든 상태 ↔ 모든 상태 가능,
 //    실제 권한은 아래 statusRequiredRole 로만 제어)
-// staff(차량담당 장로): 1차 승인, manager(기획장로): 2차(최종) 승인
+// staff(담당장로 및 부서장): 1차 결재, manager(차량담당 장로): 2차(최종) 승인
 // emergency(긴급승인자): 1차+2차 모두 가능
 // member(부원): 승인 권한 없음 (조회만)
 // super_admin: 모든 권한
@@ -163,8 +163,8 @@ export interface Admin {
 // 관리자 역할 한글 매핑
 export const roleLabel: Record<string, string> = {
   super_admin: "최고관리자",
-  staff: "차량담당 장로",
-  manager: "기획장로",
+  staff: "담당장로 및 부서장",
+  manager: "차량담당 장로",
   emergency: "긴급승인자",
   member: "부원",
 };

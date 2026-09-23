@@ -72,9 +72,9 @@ export default function CheckPage() {
   function getStatusGuide(status: string) {
     switch (status) {
       case "pending":
-        return "차량담당 장로 승인을 기다리고 있습니다";
+        return "담당장로 및 부서장 결재를 기다리고 있습니다";
       case "staff_approved":
-        return "차량담당 장로가 승인했습니다. 기획장로 최종 승인을 기다리고 있습니다";
+        return "담당장로 및 부서장이 결재했습니다. 차량담당 장로 최종 승인을 기다리고 있습니다";
       case "approved":
         return "최종 승인되었습니다. 대여 시 차량 사진을 촬영하고 '대여 시작'을 눌러주세요";
       case "in_use":
@@ -242,9 +242,9 @@ export default function CheckPage() {
                     <div className="flex gap-3">
                       <div className="flex-1 text-center">
                         <div className={`text-xs font-bold ${r.staff_approved_at ? "text-emerald-600" : "text-gray-300"}`}>
-                          {r.staff_approved_at ? "✓ 승인" : "⏳ 대기"}
+                          {r.staff_approved_at ? "✓ 결재" : "⏳ 대기"}
                         </div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">차량담당 장로</div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">담당장로 및 부서장</div>
                         {r.staff_approved_at && (
                           <div className="text-[10px] text-gray-400">
                             {new Date(r.staff_approved_at).toLocaleDateString("ko-KR")}
@@ -256,7 +256,7 @@ export default function CheckPage() {
                         <div className={`text-xs font-bold ${r.manager_approved_at ? "text-green-600" : "text-gray-300"}`}>
                           {r.manager_approved_at ? "✓ 승인" : "⏳ 대기"}
                         </div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">기획장로</div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">차량담당 장로</div>
                         {r.manager_approved_at && (
                           <div className="text-[10px] text-gray-400">
                             {new Date(r.manager_approved_at).toLocaleDateString("ko-KR")}

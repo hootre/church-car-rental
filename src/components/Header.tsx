@@ -144,6 +144,7 @@ export default function Header() {
               <DesktopNavItem href="/" label="홈" active={pathname === "/"} />
               <DesktopNavItem href="/reserve" label="예약신청" active={pathname === "/reserve"} />
               <DesktopNavItem href="/check" label="예약조회" active={pathname === "/check"} />
+              <DesktopNavItem href="/schedule" label="일정" active={pathname === "/schedule"} />
               <DesktopNavItem href="/admin" label="관리자" active={pathname?.startsWith("/admin")} />
             </nav>
           </div>
@@ -154,8 +155,9 @@ export default function Header() {
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 safe-area-bottom md:hidden">
         <div className="max-w-lg mx-auto flex">
           <MobileNavItem href="/" label="홈" icon={HomeIcon} active={pathname === "/"} />
-          <MobileNavItem href="/reserve" label="예약신청" icon={CalendarIcon} active={pathname === "/reserve"} />
+          <MobileNavItem href="/reserve" label="예약신청" icon={PlusIcon} active={pathname === "/reserve"} />
           <MobileNavItem href="/check" label="예약조회" icon={SearchIcon} active={pathname === "/check"} />
+          <MobileNavItem href="/schedule" label="일정" icon={CalendarIcon} active={pathname === "/schedule"} />
           <MobileNavItem href="/admin" label="관리자" icon={ShieldIcon} active={pathname?.startsWith("/admin")} />
         </div>
       </nav>
@@ -203,6 +205,14 @@ function HomeIcon({ className }: { className?: string }) {
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
         d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+    </svg>
+  );
+}
+
+function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
     </svg>
   );
 }

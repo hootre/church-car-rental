@@ -433,7 +433,7 @@ export default function ReservePage() {
             </div>
 
             <p className="mt-4 text-xs text-gray-400 text-center">
-              신청 후 차량담당 장로 → 기획장로 순서로 승인이 완료되면 차량을 이용하실 수 있습니다
+              신청 후 담당장로 및 부서장 결재 → 차량담당 장로 승인 순서로 완료되면 차량을 이용하실 수 있습니다
             </p>
 
             <div className="mt-6 flex gap-3">

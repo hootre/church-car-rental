@@ -382,8 +382,8 @@ export default function AdminManagement({ currentAdminId, currentAdminRole, curr
                 className="input-field !py-2 text-sm"
               >
                 <option value="member">부원 (조회만)</option>
-                <option value="staff">차량담당 장로 (1차 승인)</option>
-                <option value="manager">기획장로 (최종 승인)</option>
+                <option value="staff">담당장로 및 부서장 (1차 결재)</option>
+                <option value="manager">차량담당 장로 (최종 승인)</option>
                 <option value="emergency">긴급승인자 (1차+2차 승인)</option>
                 <option value="super_admin">최고관리자 (모든 권한)</option>
               </select>

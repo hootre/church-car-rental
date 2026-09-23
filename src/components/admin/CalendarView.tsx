@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import toast from "react-hot-toast";
 import StatusBadge from "@/components/StatusBadge";
 import ReservationDetailModal from "@/components/admin/ReservationDetailModal";
+import ScheduleDetailPopup from "@/components/ScheduleDetailPopup";
 import { supabase, Reservation, Vehicle, Admin } from "@/lib/supabase";
 
 // 요일 이름
@@ -50,9 +51,11 @@ interface EventBar {
 interface CalendarProps {
   adminId?: string;
   adminRole?: string;
+  /** 비로그인 공개 일정 모드: 읽기 전용, 연락처 비노출, 거절 건 제외 */
+  publicMode?: boolean;
 }
 
-export default function CalendarView({ adminId, adminRole }: CalendarProps) {
+export default function CalendarView({ adminId, adminRole, publicMode = false }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,11 +65,12 @@ export default function CalendarView({ adminId, adminRole }: CalendarProps) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
 
-  // 모달에 전달할 차량/관리자 목록
+  // 모달에 전달할 차량/관리자 목록 (공개 모드는 관리자 모달을 쓰지 않으므로 생략)
   useEffect(() => {
+    if (publicMode) return;
     supabase.from("vehicles").select("*").order("sort_order").then(({ data }) => setVehicles(data || []));
     supabase.from("admins").select("*").then(({ data }) => setAdmins(data || []));
-  }, []);
+  }, [publicMode]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -98,9 +102,13 @@ export default function CalendarView({ adminId, adminRole }: CalendarProps) {
       toast.error("일정을 불러오지 못했습니다");
       console.error(error);
     } else {
-      setReservations((data || []).filter((r) => r.status !== "cancelled"));
+      setReservations(
+        (data || []).filter(
+          (r) => r.status !== "cancelled" && !(publicMode && r.status === "rejected")
+        )
+      );
     }
-  }, [year, month]);
+  }, [year, month, publicMode]);
 
   useEffect(() => {
     fetchReservations();
@@ -545,8 +553,16 @@ export default function CalendarView({ adminId, adminRole }: CalendarProps) {
         )}
       </div>
 
-      {/* 공통 예약 상세 모달 */}
-      {popupReservation && (
+      {/* 공개 모드: 읽기 전용 상세 팝업 */}
+      {popupReservation && publicMode && (
+        <ScheduleDetailPopup
+          reservation={popupReservation}
+          onClose={() => setPopupReservation(null)}
+        />
+      )}
+
+      {/* 관리자 모드: 공통 예약 상세 모달 */}
+      {popupReservation && !publicMode && (
         <ReservationDetailModal
           reservation={popupReservation}
           adminId={adminId || ""}
@@ -640,7 +656,7 @@ export default function CalendarView({ adminId, adminRole }: CalendarProps) {
       })()}
 
       {/* 이번 달 요약 */}
-      {!selectedDate && (
+      {!selectedDate && !publicMode && (
         <MonthSummary reservations={reservations} />
       )}
 
@@ -711,10 +727,12 @@ export default function CalendarView({ adminId, adminRole }: CalendarProps) {
                         <span className="text-gray-900">{r.purpose}</span>
                       </div>
                     )}
-                    <div className="flex justify-between">
-                      <span>연락처</span>
-                      <span className="text-gray-900">{r.phone}</span>
-                    </div>
+                    {!publicMode && (
+                      <div className="flex justify-between">
+                        <span>연락처</span>
+                        <span className="text-gray-900">{r.phone}</span>
+                      </div>
+                    )}
                   </div>
                 </button>
               ))}
@@ -763,8 +781,8 @@ function MonthSummary({ reservations }: { reservations: Reservation[] }) {
       <h4 className="font-bold text-gray-900 text-sm">이번 달 요약</h4>
 
       <div className="grid grid-cols-3 gap-1.5">
-        <MiniStat label="담당장로" count={stats.pending} />
-        <MiniStat label="기획장로" count={stats.staff_approved} />
+        <MiniStat label="1차 대기" count={stats.pending} />
+        <MiniStat label="2차 대기" count={stats.staff_approved} />
         <MiniStat label="승인완료" count={stats.approved} />
         <MiniStat label="대여중" count={stats.in_use} />
         <MiniStat label="반납완료" count={stats.returned} />
